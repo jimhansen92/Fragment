@@ -1,0 +1,2169 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fragment</title>
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: lugn, sval nordisk skog. IDEA: ett spel som börjar i en skog.
+   PICTURE: själva 3D-skogen. COLOUR: barrgrönt, dimblått, varm orange knapp. TYPE: Bitter. LAYOUT: helskärm, startkort i mitten. */
+html,body{margin:0;height:100%;overflow:hidden;background:#c6dde0;font-family:Bitter,Georgia,serif}
+canvas{display:block;touch-action:none}
+#start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(12,26,16,.5);color:#f3efe2;z-index:5;padding:16px}
+#start.hide{display:none}
+.card{max-width:560px;width:100%;max-height:calc(100vh - 32px);overflow-y:auto;padding:28px 30px;background:rgba(16,30,20,.9);border-radius:14px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+h1{margin:0 0 4px;font-size:46px;line-height:1.05;font-weight:700}
+.sub{margin:0 0 4px;opacity:.75;font-size:15px}
+.keys{display:grid;grid-template-columns:auto auto;gap:8px 16px;text-align:left;margin:20px auto;width:max-content;font-size:15px;align-items:center}
+kbd{display:inline-block;background:#2f4c36;padding:3px 8px;border-radius:6px;font-family:inherit;font-size:14px;margin-right:3px;border-bottom:2px solid #1d3123}
+details.set{text-align:left;margin:4px 0 22px;border-top:1px solid rgba(243,239,226,.15);padding-top:10px}
+details.set summary{cursor:pointer;font-weight:700;font-size:17px;padding:8px 0;list-style-position:inside}
+.grp{margin:14px 0 4px;font-size:13px;opacity:.6;font-weight:700}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:2px 12px;align-items:center;margin:6px 0}
+.row label{font-size:15px}
+.row output{text-align:right;font-variant-numeric:tabular-nums;color:#e8a33a;font-weight:700;font-size:14px;white-space:nowrap}
+.row input{grid-column:1/-1;width:100%;accent-color:#e8a33a;height:26px;margin:0;cursor:pointer}
+.reset{background:transparent;color:#f3efe2;border:1px solid rgba(243,239,226,.35);font-size:15px;padding:8px 16px;margin-top:10px}
+.reset:hover{background:rgba(243,239,226,.1)}
+button{font:inherit;font-size:18px;font-weight:700;padding:12px 28px;border:0;border-radius:10px;background:#e8a33a;color:#1b1408;cursor:pointer;min-height:44px}
+button:hover{background:#f2b453}
+button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#cross{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,255,255,.9);box-shadow:0 0 3px rgba(0,0,0,.7);display:none;pointer-events:none}
+#stam{position:fixed;left:50%;bottom:28px;width:220px;height:7px;margin-left:-110px;border-radius:4px;background:rgba(10,20,12,.45);overflow:hidden;opacity:0;transition:opacity .6s;pointer-events:none;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+#stam i{display:block;height:100%;width:100%;background:#f3efe2;border-radius:4px}
+#stam.tired i{background:#d9583b}
+#compass{position:fixed;left:50%;top:14px;width:400px;max-width:calc(100vw - 32px);height:52px;transform:translateX(-50%);pointer-events:none;display:none}
+#compass.on{display:block}
+#fps{position:fixed;right:14px;top:12px;color:#fff;font:700 14px/1 Bitter,Georgia,serif;text-shadow:0 1px 3px #000;display:none;pointer-events:none;font-variant-numeric:tabular-nums}
+#hint{position:fixed;left:16px;bottom:14px;color:#fff;font-size:14px;text-shadow:0 1px 3px #000;opacity:.85;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="start">
+  <div class="card">
+    <h1>Fragment</h1>
+    <p class="sub">Aim-bana: du mot en bot. Första till att döda vinner rundan.</p>
+    <div class="keys">
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Gå</span>
+      <span><kbd>Mus</kbd></span><span>Titta runt</span>
+      <span><kbd>Shift</kbd></span><span>Gå tyst (CS) · Spring (realistisk)</span>
+      <span><kbd>C</kbd> / <kbd>Ctrl</kbd></span><span>Huka (CS)</span>
+      <span><kbd>Space</kbd></span><span>Hoppa</span>
+      <span><kbd>Mus1</kbd></span><span>Skjut</span>
+      <span><kbd>Mus2</kbd></span><span>Glock: burst · Kniv: stick</span>
+      <span><kbd>R</kbd></span><span>Ladda om</span>
+      <span><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd></span><span>AK-47 / Glock-18 / Kniv</span>
+      <span><kbd>Q</kbd></span><span>Byt till senaste vapnet</span>
+      <span><kbd>N</kbd></span><span>Visa/dölj kompass</span>
+      <span><kbd>Scroll</kbd></span><span>Ändra synfält</span>
+      <span><kbd>Esc</kbd></span><span>Pausa</span>
+    </div>
+    <button id="play">Klicka för att spela</button>
+    <details class="set" id="setBox">
+      <summary>Inställningar</summary>
+      <div id="settings"></div>
+      <button class="reset" id="reset" type="button">Återställ allt</button>
+    </details>
+  </div>
+</div>
+<div id="cross"></div>
+<div id="stam"><i></i></div>
+<div id="fps"></div>
+<canvas id="compass" width="400" height="52"></canvas>
+<div id="hint"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+{
+// ---------- Grund ----------
+let seed = 1337;
+const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+const SIZE = 200, HALF = SIZE / 2;
+
+const H = () => 0; // helt platt bana
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const cv = renderer.domElement;
+
+const scene = new THREE.Scene();
+const FOG = 0xd9e4e6;
+scene.background = new THREE.Color(FOG);
+scene.fog = new THREE.Fog(FOG, 70, 260);
+
+const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 420);
+camera.rotation.order = 'YXZ';
+
+// ---------- Himmel och ljus ----------
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(360, 24, 12),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: new THREE.Color(0x5b9dd0) }, bot: { value: new THREE.Color(FOG) } },
+    vertexShader: 'varying vec3 vP;void main(){vP=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader: 'uniform vec3 top;uniform vec3 bot;varying vec3 vP;void main(){float h=clamp(vP.y*1.8,0.0,1.0);gl_FragColor=vec4(mix(bot,top,h),1.0);}'
+  })
+);
+sky.renderOrder = -1;
+scene.add(sky);
+
+const SUNDIR = new THREE.Vector3(40, 70, 25);
+const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(7, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff4d6, fog: false }));
+scene.add(sunDisc);
+
+scene.add(new THREE.HemisphereLight(0xd6ecff, 0x3b5527, 0.7));
+const sun = new THREE.DirectionalLight(0xfff0d2, 0.95);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+const sc = sun.shadow.camera;
+sc.left = -45; sc.right = 45; sc.top = 45; sc.bottom = -45; sc.near = 1; sc.far = 220;
+sun.shadow.bias = -0.0006;
+scene.add(sun, sun.target);
+
+// ---------- Arena (i stil med aim_map) ----------
+// Platt, inhägnad bana: stengolv, sandstensmurar och trälådor som skydd.
+// Allt är spegelvänt så att båda sidor är lika.
+const ARENA_W = 34, ARENA_L = 52, WALL_H = 6.5, WALL_T = 1;
+const maxAniso = renderer.capabilities.getMaxAnisotropy();
+function canvasTex(size, draw) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'); draw(g, size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso;
+  return t;
+}
+function speckle(g, size, n, a) { // lite brus så att ytorna inte blir platta
+  for (let i = 0; i < n; i++) {
+    const v = Math.random() < 0.5 ? 0 : 255;
+    g.fillStyle = `rgba(${v},${v},${v},${Math.random() * a})`;
+    g.fillRect(Math.random() * size, Math.random() * size, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  }
+}
+// Golv: stora sandstensplattor, 2 × 2 m (en bild = 4 × 4 m)
+const floorTex = canvasTex(512, (g, s) => {
+  g.fillStyle = '#c4ab80'; g.fillRect(0, 0, s, s);
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+    const v = Math.random() * 18 - 9;
+    g.fillStyle = `rgb(${196 + v},${171 + v},${128 + v})`;
+    g.fillRect(i * 256 + 3, j * 256 + 3, 250, 250);
+  }
+  speckle(g, s, 9000, 0.12);
+  g.strokeStyle = 'rgba(90,70,40,.55)'; g.lineWidth = 5;
+  for (let k = 0; k <= 2; k++) { g.beginPath(); g.moveTo(k * 256, 0); g.lineTo(k * 256, s); g.moveTo(0, k * 256); g.lineTo(s, k * 256); g.stroke(); }
+});
+// Murar: sandstensblock 1 × 0,5 m i förband (en bild = 2 × 2 m)
+const wallTex = canvasTex(512, (g, s) => {
+  g.fillStyle = '#9c8762'; g.fillRect(0, 0, s, s);
+  const bw = 256, bh = 64;
+  for (let r = 0; r < s / bh; r++) for (let c = -1; c < s / bw + 1; c++) {
+    const x = c * bw + (r % 2 ? bw / 2 : 0), v = Math.random() * 24 - 12;
+    g.fillStyle = `rgb(${214 + v},${190 + v},${146 + v})`;
+    g.fillRect(x + 4, r * bh + 4, bw - 8, bh - 8);
+  }
+  speckle(g, s, 7000, 0.14);
+});
+// Trälåda: plankor, mörk ram och ett kryss
+const crateTex = canvasTex(256, (g, s) => {
+  g.fillStyle = '#9a6b37'; g.fillRect(0, 0, s, s);
+  for (let i = 0; i < 6; i++) {
+    const v = Math.random() * 20 - 10;
+    g.fillStyle = `rgb(${168 + v},${120 + v},${66 + v})`; g.fillRect(0, i * s / 6 + 2, s, s / 6 - 4);
+  }
+  speckle(g, s, 2500, 0.15);
+  g.strokeStyle = '#5c3d1c'; g.lineWidth = 26; g.strokeRect(13, 13, s - 26, s - 26);
+  g.lineWidth = 20; g.beginPath(); g.moveTo(26, 26); g.lineTo(s - 26, s - 26); g.moveTo(s - 26, 26); g.lineTo(26, s - 26); g.stroke();
+  g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 3; g.strokeRect(2, 2, s - 4, s - 4);
+});
+
+// Låda med UV i världens mått, så att mönstret har samma storlek på alla ytor
+function worldBox(w, h, d, tile) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i) + w / 2, y = p.getY(i), z = p.getZ(i) + d / 2;
+    if (Math.abs(n.getX(i)) > 0.5) uv.setXY(i, z / tile, y / tile);
+    else if (Math.abs(n.getY(i)) > 0.5) uv.setXY(i, x / tile, z / tile);
+    else uv.setXY(i, x / tile, y / tile);
+  }
+  return geo;
+}
+
+const floorMat = new THREE.MeshLambertMaterial({ map: floorTex });
+const wallMat = new THREE.MeshLambertMaterial({ map: wallTex });
+const crateMat = new THREE.MeshLambertMaterial({ map: crateTex });
+
+// Golv
+{
+  const geo = new THREE.PlaneGeometry(ARENA_W + 2 * WALL_T, ARENA_L + 2 * WALL_T);
+  geo.rotateX(-Math.PI / 2);
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (ARENA_W + 2) / 4, uv.getY(i) * (ARENA_L + 2) / 4);
+  const floor = new THREE.Mesh(geo, floorMat);
+  floor.receiveShadow = true;
+  scene.add(floor);
+}
+
+// Alla lådor och murar man kan krocka med och stå på
+const boxes = [];
+function addBox(x, z, w, h, d, mat, base = 0, worldUV = 0) {
+  const geo = worldUV ? worldBox(w, h, d, worldUV) : new THREE.BoxGeometry(w, h, d);
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, base + h / 2, z);
+  m.castShadow = true; m.receiveShadow = true;
+  scene.add(m);
+  boxes.push({ minx: x - w / 2, maxx: x + w / 2, minz: z - d / 2, maxz: z + d / 2, base, top: base + h, kind: mat === crateMat ? 'wood' : 'stone' });
+}
+// Yttermurar
+addBox(0, -ARENA_L / 2 - WALL_T / 2, ARENA_W + 2 * WALL_T, WALL_H, WALL_T, wallMat, 0, 2);
+addBox(0, ARENA_L / 2 + WALL_T / 2, ARENA_W + 2 * WALL_T, WALL_H, WALL_T, wallMat, 0, 2);
+addBox(-ARENA_W / 2 - WALL_T / 2, 0, WALL_T, WALL_H, ARENA_L, wallMat, 0, 2);
+addBox(ARENA_W / 2 + WALL_T / 2, 0, WALL_T, WALL_H, ARENA_L, wallMat, 0, 2);
+// En list längst upp på murarna
+{
+  const capMat = new THREE.MeshLambertMaterial({ color: 0xb59c70 });
+  for (const [x, z, w, d] of [[0, -ARENA_L / 2 - 0.5, ARENA_W + 3, 1.4], [0, ARENA_L / 2 + 0.5, ARENA_W + 3, 1.4],
+    [-ARENA_W / 2 - 0.5, 0, 1.4, ARENA_L + 3], [ARENA_W / 2 + 0.5, 0, 1.4, ARENA_L + 3]]) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), capMat);
+    m.position.set(x, WALL_H + 0.15, z); m.castShadow = true; scene.add(m);
+  }
+}
+
+// Lådor: s = hel låda (kub), annars w/h/d. Varje låda speglas till andra halvan.
+const C = 1.2; // en vanlig låda är 1,2 m
+const HALF_LAYOUT = [
+  { x: -8, z: 12, s: 2 * C },                  // stor låda vid spawn
+  { x: -5.9, z: 12.6, s: C },
+  { x: -4.5, z: 12.6, w: C, h: C / 2, d: C },  // halvlåda: hoppa upp på den
+  { x: 7.5, z: 9, s: C },
+  { x: 7.5, z: 9, s: C, base: C },             // staplad låda
+  { x: 8.9, z: 9, w: C, h: C / 2, d: C },
+  { x: 2.5, z: 5.5, s: C },
+  { x: 13.4, z: 21.4, s: 2 * C },              // hörnlåda
+  { x: -13.6, z: 3.5, w: 4, h: 1.3, d: 0.8, wall: true } // låg mur
+];
+for (const b of HALF_LAYOUT) {
+  for (const sgn of [1, -1]) {
+    const w = b.s || b.w, h = b.s || b.h, d = b.s || b.d;
+    addBox(b.x * sgn, b.z * sgn, w, h, d, b.wall ? wallMat : crateMat, b.base || 0, b.wall ? 2 : 0);
+  }
+}
+// Mitten
+addBox(-2.6, 0, 2 * C, 2 * C, 2 * C, crateMat);
+addBox(2.6, 0, 2 * C, 2 * C, 2 * C, crateMat);
+addBox(-2.6, 0, C, C, C, crateMat, 2 * C);
+addBox(0, 0, C, C / 2, C, crateMat);
+
+// Höjden där du står: golvet eller en låda om du är uppe på den.
+// Lådor upp till ~0,35 m högre än fötterna räknas som ett steg; högre måste man hoppa upp på.
+const STEP_UP = 0.35;
+let curTol = STEP_UP; // hur högt man kan kliva upp just nu
+function groundAt(x, z, py) {
+  let g = 0;
+  for (const b of boxes) {
+    if (x > b.minx && x < b.maxx && z > b.minz && z < b.maxz && py >= b.top - curTol) g = Math.max(g, b.top);
+  }
+  return g;
+}
+// Krock: skjut ut spelaren ur lådor och murar som är högre än fötterna
+function collideBoxes() {
+  const r = BODY;
+  for (const b of boxes) {
+    if (P.pos.y >= b.top - curTol || P.pos.y + 1.8 <= b.base) continue;
+    const x0 = b.minx - r, x1 = b.maxx + r, z0 = b.minz - r, z1 = b.maxz + r;
+    if (P.pos.x <= x0 || P.pos.x >= x1 || P.pos.z <= z0 || P.pos.z >= z1) continue;
+    const pl = P.pos.x - x0, pr = x1 - P.pos.x, pn = P.pos.z - z0, pf = z1 - P.pos.z;
+    const m = Math.min(pl, pr, pn, pf);
+    if (m === pl) { P.pos.x = x0; if (P.vel.x > 0) P.vel.x = 0; }
+    else if (m === pr) { P.pos.x = x1; if (P.vel.x < 0) P.vel.x = 0; }
+    else if (m === pn) { P.pos.z = z0; if (P.vel.z > 0) P.vel.z = 0; }
+    else { P.pos.z = z1; if (P.vel.z < 0) P.vel.z = 0; }
+  }
+}
+function updateWorld() {}
+
+// ---------- Spelare ----------
+const P = { inWater: false, pos: new THREE.Vector3(0, 0, ARENA_L / 2 - 3), vel: new THREE.Vector3(), yaw: 0, pitch: 0, ground: true, bob: 0, hs: 0 };
+const EYE = 1.7, BODY = 0.35;
+const keys = {};
+let playing = false, locked = false, dragMode = false, drag = null;
+
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space' || ((e.ctrlKey) && playing && e.code !== 'KeyW')) e.preventDefault();
+  if (e.code === 'Escape' && dragMode && playing) pause();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+function look(dx, dy) {
+  // I luften är huvudet låst (eller delvis låst, enligt inställningen)
+  // Mjuk övergång: musen saktar in när du lämnar marken och blir normal när du landar
+  const f = S.mode === 1 ? 1 : 1 + (S.airMouse - 1) * airAmt; // i CS-läget styr man fritt i luften
+  if (f <= 0) return;
+  // I CS-läget räknas känsligheten som i CS: 0,022° per musrörelse × din CS-känslighet
+  const k = S.mode === 1 ? 0.022 * S.csSens * Math.PI / 180 : 0.0022 * S.sens;
+  const dYaw = dx * k * f;
+  P.yaw -= dYaw;
+  turnAcc -= dYaw; // samlas ihop för kameralutningen
+  addLookSway(dx, dy);
+  P.pitch = Math.max(-1.55, Math.min(1.55, P.pitch - dy * k * f));
+}
+document.addEventListener('mousemove', e => { if (locked && playing) look(e.movementX, e.movementY); });
+cv.addEventListener('pointerdown', e => { if (dragMode && playing) drag = { x: e.clientX, y: e.clientY }; });
+addEventListener('pointermove', e => {
+  if (!drag) return;
+  look((e.clientX - drag.x) * 1.5, (e.clientY - drag.y) * 1.5);
+  drag.x = e.clientX; drag.y = e.clientY;
+});
+addEventListener('pointerup', () => { drag = null; });
+
+const startEl = document.getElementById('start'), crossEl = document.getElementById('cross'), hintEl = document.getElementById('hint');
+function resume() {
+  playing = true; startEl.classList.add('hide'); crossEl.style.display = 'block';
+  hintEl.textContent = dragMode ? 'Dra med musen för att titta runt · Esc = pausa' : 'Esc = pausa';
+}
+function pause() {
+  playing = false; startEl.classList.remove('hide'); crossEl.style.display = 'none'; hintEl.textContent = '';
+  for (const k in keys) keys[k] = false;
+}
+function useDrag() { dragMode = true; if (playing) resume(); }
+
+document.addEventListener('pointerlockchange', () => {
+  locked = document.pointerLockElement === cv;
+  if (!locked && playing && !dragMode) pause();
+});
+let tryingRaw = false;
+document.addEventListener('pointerlockerror', () => { if (!tryingRaw) useDrag(); });
+document.getElementById('play').addEventListener('click', () => {
+  resume();
+  if (dragMode) return;
+  try {
+    // Rå musrörelse utan Windows-acceleration (som raw input i CS), om webbläsaren klarar det
+    let r = null;
+    tryingRaw = true;
+    try { r = cv.requestPointerLock({ unadjustedMovement: true }); } catch (e2) { r = null; }
+    if (r && r.then) {
+      r.then(() => { tryingRaw = false; }, () => {
+        tryingRaw = false; // rå mus stöds inte: vanlig muslåsning i stället
+        try { const r2 = cv.requestPointerLock(); if (r2 && r2.catch) r2.catch(useDrag); } catch (e3) { useDrag(); }
+      });
+    } else tryingRaw = false;
+  } catch (err) { useDrag(); }
+});
+
+// ---------- Fotsteg (ljud) ----------
+let actx = null, noiseBuf = null;
+function initAudio() {
+  try {
+    if (!actx) {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.25, actx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (actx.state === 'suspended') actx.resume();
+  } catch (e) { actx = null; }
+}
+function footstep(vol) {
+  if (!actx || actx.state !== 'running') return;
+  try {
+    const t = actx.currentTime;
+    const src = actx.createBufferSource(); src.buffer = noiseBuf;
+    src.playbackRate.value = 0.8 + Math.random() * 0.4;
+    const wet = P.inWater; // plask i vattnet i stället för prassel i mossan
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = wet ? 1400 + Math.random() * 1400 : 750 + Math.random() * 550; bp.Q.value = wet ? 0.5 : 1.2; // hårt stengolv med lite sand
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = wet ? 5000 : 3600;
+    if (wet) { vol *= 1.3; src.playbackRate.value *= 0.7; }
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    if (S.steps <= 0) return;
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, 0.3 * vol * S.steps), t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (wet ? 0.32 : 0.11) + Math.random() * 0.04);
+    src.loop = wet;
+    src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(actx.destination);
+    src.start(t); src.stop(t + (wet ? 0.45 : 0.25));
+  } catch (e) {}
+}
+function pant(vol, inhale) {
+  if (!actx || actx.state !== 'running' || S.pant <= 0 || vol <= 0.01) return;
+  try {
+    const t = actx.currentTime, dur = inhale ? 0.38 : 0.5;
+    const src = actx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = inhale ? 1500 : 900; bp.Q.value = 0.7;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.09 * vol * S.pant, t + dur * 0.35);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp); bp.connect(g); g.connect(actx.destination);
+    src.start(t); src.stop(t + dur + 0.05);
+  } catch (e) {}
+}
+document.getElementById('play').addEventListener('click', initAudio);
+
+// ---------- Ork ----------
+const stamEl = document.getElementById('stam'), stamBar = stamEl.querySelector('i');
+let stam = 1, exhausted = false, fatigue = 0, regenWait = 0, breathPh = 0, lastBreath = 0;
+
+// ---------- Gång ----------
+// Varje hopp får en egen slumpad "stil" så att huvudrörelserna inte blir likadana
+const JV = { kp: 1, kr: 0, ky: 0, lean: 0, fm: 1, ph: 0, amp: 1, lr: 0, ln: 0, stiff: 100, damp: 11 };
+const rr = (a, b) => a + Math.random() * (b - a);
+const rsign = () => (Math.random() < 0.5 ? -1 : 1);
+function newJumpStyle() {
+  const v = S.jumpVar;
+  JV.kp = 1 + rr(-0.6, 0.8) * v;            // hur mycket huvudet nickar vid avstampet
+  JV.kr = rsign() * rr(0, 0.035) * v;       // lutar åt vänster eller höger vid avstampet
+  JV.ky = rsign() * rr(0, 0.02) * v;        // vrider sig lite
+  JV.lean = rsign() * rr(0, 0.03) * v;      // lutning som håller i sig under hela hoppet
+  JV.fm = 1 + rr(-0.35, 0.45) * v;          // hur snabbt kroppen darrar i luften
+  JV.ph = rr(0, 100);                       // var i darrningen man börjar
+  JV.amp = Math.max(0.2, 1 + rr(-0.5, 0.7) * v); // hur mycket det darrar
+  JV.lr = rsign() * rr(0.2, 1) * v;         // landning: lutar åt sidan
+  JV.ln = rr(-0.4, 1) * v;                  // landning: nickar framåt (eller bakåt)
+  JV.stiff = 100 + rr(-30, 50) * v;                   // landning: hur styva knäna är
+  JV.damp = 11 + rr(-4, 3) * v;                      // landning: hur mycket det studsar
+}
+let turnAcc = 0, camTilt = 0, camY = null;
+let landPos = 0, landVel = 0, landRoll = 0, landNod = 0, kickRoll = 0, kickYaw = 0;
+let landDip = 0, lastStep = 0, time = 0, jumpCd = 0, jumpReleased = true, jumpKick = 0, airAmt = 0, leap = false;
+
+// ---------- CS-rörelse ----------
+// Samma rörelsemodell som Counter-Strike (Quake/GoldSrc/Source): friktion och acceleration på marken,
+// luftacceleration med lågt tak (air strafe, bunnyhopp), hopputhållighet som bromsar efter hopp,
+// hukning som tar tid, och att man bara kan kliva upp på kanter från marken – i luften måste fötterna
+// faktiskt komma över kanten (därför behövs crouch-jump upp på lådor).
+// Måtten är omräknade så att en låda på 1,2 m motsvarar CS-lådans 64 enheter.
+const CS_U = 1.2 / 64;                 // meter per CS-enhet
+const CS_GRAV = 800 * CS_U;            // sv_gravity 800 ≈ 15 m/s²
+// Förinställningar: [maxfart, sv_accelerate, sv_airaccelerate, sv_friction, sv_stopspeed, hopphöjd (enheter), hukningstid (s), bunnyhoppstak]
+const CS_PRESETS = [
+  { name: 'CS 1.6', speed: 280, accel: 5, air: 10, fric: 4, stop: 75, jump: 46, duck: 0.4, bhop: 1.2 },
+  { name: 'CS2', speed: 280, accel: 5.5, air: 12, fric: 5.2, stop: 80, jump: 56, duck: 0.2, bhop: 3 }
+];
+let csDucked = false, csDuck = 0, csDuckT = 0, csJumpBuf = 0, csStepDist = 0, csFuser = 0, csStam = 0;
+function csFriction(dt) {
+  const sp = Math.hypot(P.vel.x, P.vel.z);
+  if (sp < 0.01) { P.vel.x = 0; P.vel.z = 0; return; }
+  const stop = S.csStop * CS_U;
+  const drop = Math.max(sp, stop) * S.csFriction * dt;
+  const k = Math.max(sp - drop, 0) / sp;
+  P.vel.x *= k; P.vel.z *= k;
+}
+function csAccelerate(wx, wz, wishspeed, accel, dt, cap) {
+  const cur = P.vel.x * wx + P.vel.z * wz;
+  const add = Math.min(wishspeed, cap) - cur;
+  if (add <= 0) return;
+  const as = Math.min(accel * dt * wishspeed, add);
+  P.vel.x += as * wx; P.vel.z += as * wz;
+}
+function csJumpNow() { csJumpBuf = 0.02; } // från scrollhjulet: ett kort tryck, som i CS
+function updateCS(dt) {
+  const is16 = S.csPreset === 0;
+  const crouchKey = keys.ControlLeft || keys.ControlRight || keys.KeyC;
+  const walkKey = keys.ShiftLeft || keys.ShiftRight;
+
+  // Hukning: på marken tar det en stund att komma ner; i luften lyfts benen direkt (crouch-jump)
+  if (crouchKey && !csDucked) {
+    csDucked = true;
+    if (!P.ground) { P.pos.y += 0.34; csDuckT = 1; }
+  } else if (!crouchKey && csDucked) {
+    csDucked = false;
+    if (!P.ground && csDuckT >= 1) P.pos.y = Math.max(P.pos.y - 0.34, groundAt(P.pos.x, P.pos.z, P.pos.y - 0.34));
+  }
+  const duckTime = CS_PRESETS[S.csPreset].duck;
+  csDuckT = Math.max(0, Math.min(1, csDuckT + (csDucked ? 1 : -1) * dt / duckTime));
+
+  let fx = 0, fz = 0;
+  if (keys.KeyW) fz -= 1; if (keys.KeyS) fz += 1;
+  if (keys.KeyA) fx -= 1; if (keys.KeyD) fx += 1;
+  const moving = fx || fz;
+  const len = Math.hypot(fx, fz) || 1; fx /= len; fz /= len;
+  const s = Math.sin(P.yaw), c = Math.cos(P.yaw);
+  const wx = fx * c + fz * s, wz = -fx * s + fz * c;
+  const maxSp = S.csSpeed * CS_U * weaponSpeedK(); // AK-47 är tyngre (221/250)
+  let wish = moving ? maxSp : 0;
+  if (P.ground && csDuckT > 0) wish *= 1 - csDuckT * (1 - 0.34);   // hukad: 34 %
+  else if (walkKey) wish *= 0.52;                                  // gå: 52 %
+  if (!is16 && csStam > 0) wish *= 1 - (csStam / 80) * 0.5;        // CS2: tröttare efter hopp
+
+  // Hopp (inget automatiskt hopp när man håller inne – nytt tryck krävs, eller scrollhjulet)
+  if (!keys.Space) jumpReleased = true;
+  if (keys.Space && jumpReleased) { csJumpBuf = 0.03; jumpReleased = false; }
+  csJumpBuf -= dt;
+  let jumpedNow = false;
+  if (P.ground && csJumpBuf > 0) {
+    csJumpBuf = 0; jumpedNow = true;
+    // Bunnyhoppsskydd (CS 1.6): över 120 % av maxfarten bromsas man ner till 65 % av taket
+    const hs0 = Math.hypot(P.vel.x, P.vel.z), cap = maxSp * S.csBhop;
+    if (S.csBhop < 3 && hs0 > cap) { const k = (cap / hs0) * 0.65; P.vel.x *= k; P.vel.z *= k; }
+    let vy = Math.sqrt(2 * CS_GRAV * S.csJump * CS_U);
+    if (is16) {
+      if (csFuser > 0) vy *= (100 - csFuser * 0.001 * 19) / 100; // lägre hopp om du nyss hoppat
+      csFuser = 1315.789;
+    } else {
+      vy *= 1 - (csStam / 80) * 0.3;
+      csStam = Math.min(80, csStam + 6.4);
+    }
+    P.vel.y = vy; P.ground = false;
+    footstep(0.9);
+  }
+
+  if (P.ground && !jumpedNow) {
+    csFriction(dt);
+    // Hopputhållighet i CS 1.6: farten bromsas en stund efter ett hopp (räknat som 100 bilder/s)
+    if (is16 && csFuser > 0) {
+      const k = Math.pow(Math.max(0, (100 - csFuser * 0.001 * 19) * 0.01), dt * 100);
+      P.vel.x *= k; P.vel.z *= k;
+    }
+    csAccelerate(wx, wz, wish, S.csAccel, dt, wish);
+  } else {
+    // I luften: farten framåt ökar knappt, men den kan vridas genom att strafea och dra musen
+    csAccelerate(wx, wz, wish, S.csAirAccel, dt, 30 * CS_U);
+  }
+  csFuser = Math.max(0, csFuser - dt * 1000);
+  csStam = Math.max(0, csStam - dt * 60);
+
+  P.vel.y -= CS_GRAV * dt;
+  const fallV = P.vel.y;
+  P.pos.addScaledVector(P.vel, dt);
+
+  // Kliva upp på kanter går bara från marken (18 enheter); i luften måste fötterna över kanten
+  curTol = P.ground ? STEP_UP : 0.03;
+  collideBoxes();
+  P.pos.x = Math.max(-ARENA_W / 2 + BODY, Math.min(ARENA_W / 2 - BODY, P.pos.x));
+  P.pos.z = Math.max(-ARENA_L / 2 + BODY, Math.min(ARENA_L / 2 - BODY, P.pos.z));
+
+  const gy = groundAt(P.pos.x, P.pos.z, P.pos.y);
+  const wasGround = P.ground;
+  if (P.pos.y <= gy || (P.ground && P.vel.y <= 0 && P.pos.y - gy < 0.36)) {
+    P.pos.y = gy; P.vel.y = 0; P.ground = true;
+  } else P.ground = false;
+  if (!wasGround && P.ground) {
+    if (fallV < -3) footstep(1.2);
+    if (!is16) csStam = Math.min(80, csStam + 4);
+  }
+  curTol = STEP_UP;
+
+  // Fotsteg hörs bara när du springer – att gå (Shift) och huka är tyst
+  const hs = Math.hypot(P.vel.x, P.vel.z);
+  P.hs = hs;
+  if (P.ground && hs > maxSp * 0.6 && csDuckT < 0.5) {
+    csStepDist += hs * dt;
+    if (csStepDist > 1.25) { csStepDist = 0; footstep(0.75); }
+  } else if (!P.ground || hs < 0.1) csStepDist = 0.9;
+
+  // Kameran: ingen gungning, bara höjden. På marken sjunker ögonen i takt med hukningen.
+  csDuck = P.ground ? csDuckT : (csDucked ? 1 : 0);
+  // Kameran följer kroppen direkt (ingen fördröjning i hopp); bara små kliv upp på kanter mjukas ut
+  const stepUp = P.pos.y - (camY === null ? P.pos.y : camY);
+  if (camY === null || !P.ground || !wasGround || stepUp <= 0 || stepUp > 0.4) camY = P.pos.y;
+  else camY += stepUp * Math.min(1, dt * 25);
+  camera.position.set(P.pos.x, camY + S.eye - csDuck * S.eye * 0.4, P.pos.z);
+  camera.rotation.set(P.pitch, P.yaw, 0);
+  stamEl.style.opacity = 0;
+  stam = 1; exhausted = false; fatigue = 0;
+}
+
+function update(dt) {
+  if (S.mode === 1) { time += dt; updateCS(dt); return; }
+  time += dt;
+  // Spring bara framåt, på marken, och bara om du orkar
+  const wantRun = (keys.ShiftLeft || keys.ShiftRight) && keys.KeyW && !keys.KeyS;
+  // Vatten: hur djupt du står (fötternas höjd jämfört med vattenytan)
+  const wDepth = 0;
+  P.inWater = false;
+  const wadeSlow = P.inWater ? 1 - Math.min(wDepth, 0.7) * 0.8 : 1; // trögt att vada
+  const running = wantRun && !exhausted && stam > 0 && wDepth < 0.25;
+  const tiredSlow = (exhausted ? 0.78 : 1) * wadeSlow;
+  const WALK = (running ? Math.max(S.runSpeed, S.speed) : S.speed * tiredSlow);
+  const BACK = S.speed * 0.64 * tiredSlow, SIDE = S.speed * 0.77 * tiredSlow;
+  const STRIDE = 1.5 * Math.sqrt(S.speed / 2.2) * S.stride; // meter per hel gångcykel (två steg)
+  const EYE = S.eye, SH = S.shake;
+  let fx = 0, fz = 0;
+  if (keys.KeyW) fz -= 1; if (keys.KeyS) fz += 1;
+  if (keys.KeyA) fx -= 1; if (keys.KeyD) fx += 1;
+  const len = Math.hypot(fx, fz) || 1; fx /= len; fz /= len;
+  // Bakåt och åt sidan går långsammare än framåt
+  const sp = fz > 0 ? BACK : (fz < 0 ? WALK : SIDE);
+  const s = Math.sin(P.yaw), c = Math.cos(P.yaw);
+  let dx0 = fx * c + fz * s, dz0 = -fx * s + fz * c;
+  // Uppför går långsammare, nedför lite snabbare
+  let slopeF = 1;
+  if (fx || fz) {
+    const rise = H(P.pos.x + dx0 * 0.6, P.pos.z + dz0 * 0.6) - H(P.pos.x, P.pos.z);
+    slopeF = Math.max(0.5, Math.min(1.12, 1 - rise * 1.3));
+  }
+  const tx = dx0 * sp * slopeF, tz = dz0 * sp * slopeF;
+  // Tröghet: man kommer igång och stannar mjukt, och styr knappt i luften
+  const moving = fx || fz;
+  const rate = 2 + (1 - S.inertia) * (1 - S.inertia) * 40;
+  // I ett springhopp bär farten nästan helt, man kan knappt bromsa i luften
+  const k = Math.min(1, dt * (P.ground ? (moving ? rate : rate * 1.75) : S.airCtl * (leap ? 4 : 6)));
+  P.vel.x += (tx - P.vel.x) * k;
+  P.vel.z += (tz - P.vel.z) * k;
+
+  // Väntetid efter landning, och man måste släppa Space mellan hoppen
+  if (!keys.Space) jumpReleased = true;
+  if (P.ground && jumpCd > 0) jumpCd -= dt;
+  if (P.ground && keys.Space && S.jump > 0 && jumpReleased && jumpCd <= 0) {
+    jumpReleased = false;
+    newJumpStyle();
+    jumpKick = JV.kp; // en stöt i kameran vid avstampet, olika stark varje gång
+    kickRoll = JV.kr; kickYaw = JV.ky;
+    jumpCd = S.jumpCd * (exhausted ? 1.6 : 1);
+    // Trött = lägre hopp, och hopp kostar ork
+    // Springhopp: tar med farten, ger en extra skjuts framåt och lite högre hopp
+    const runSpd = Math.hypot(P.vel.x, P.vel.z);
+    leap = running && runSpd > S.speed * 1.05 && S.runJump > 0;
+    if (leap) jumpCd = S.leapCd * (exhausted ? 1.6 : 1); // längre vila efter ett springhopp
+    const jh = S.jump * (exhausted ? 0.5 : 1) * (P.inWater ? 0.6 : 1);
+    P.vel.y = Math.sqrt(2 * S.gravity * jh); P.ground = false;
+    if (leap) {
+      // Avstampet tar bara med en del av springfarten (standard 70 %)
+      const keep = Math.max(0.3, Math.min(1.2, 0.5 + 0.2 * S.runJump));
+      P.vel.x *= keep; P.vel.z *= keep;
+      jumpKick = JV.kp * 1.6; kickRoll *= 1.5;
+    }
+    stam = Math.max(0, stam - (leap ? 0.13 : 0.07)); regenWait = 0.6;
+    if (stam <= 0) exhausted = true;
+  }
+  P.vel.y -= S.gravity * dt;
+  const fallV = P.vel.y;
+  P.pos.addScaledVector(P.vel, dt);
+
+  collideBoxes();
+  // Säkerhet: stanna alltid innanför murarna
+  P.pos.x = Math.max(-ARENA_W / 2 + BODY, Math.min(ARENA_W / 2 - BODY, P.pos.x));
+  P.pos.z = Math.max(-ARENA_L / 2 + BODY, Math.min(ARENA_L / 2 - BODY, P.pos.z));
+
+  const gy = groundAt(P.pos.x, P.pos.z, P.pos.y);
+  const wasGround = P.ground;
+  if (P.pos.y <= gy || (P.ground && P.vel.y <= 0 && P.pos.y - gy < 0.45)) {
+    P.pos.y = gy; P.vel.y = 0; P.ground = true;
+  } else P.ground = false;
+  // Landning: knäna fjädrar och det låter
+  if (!wasGround && P.ground && fallV < -2) {
+    // Knäna fjädrar som en fjäder: ibland mjukt, ibland med en liten extra studs
+    const impact = Math.min(0.45, -fallV * 0.035 * (leap ? 1.35 : 1)) * SH;
+    landVel -= impact * Math.sqrt(JV.stiff);
+    landRoll = JV.lr * impact * 0.12;
+    landNod = JV.ln * impact * 0.18;
+    footstep(leap ? 1.6 : 1.3); setTimeout(() => footstep(0.8), 70);
+    if (leap) { // landningen äter upp lite av farten
+      P.vel.x *= 0.75; P.vel.z *= 0.75;
+    }
+  }
+  if (P.ground) leap = false;
+  {
+    const st = Math.min(dt, 1 / 60); let rem = dt;
+    while (rem > 1e-5) { // små steg så att fjädern är stabil
+      const h = Math.min(st, rem); rem -= h;
+      landVel += (-JV.stiff * landPos - JV.damp * landVel) * h;
+      landPos += landVel * h;
+    }
+  }
+  landRoll += (0 - landRoll) * Math.min(1, dt * 5);
+  landNod += (0 - landNod) * Math.min(1, dt * 6);
+
+  const hs = Math.hypot(P.vel.x, P.vel.z);
+  P.hs = hs;
+
+  // Ork: töms när du springer, fylls på när du går eller står still
+  if (running && hs > S.speed * 1.05) {
+    stam -= dt / S.stamina; regenWait = 1.0;
+    if (stam <= 0) { stam = 0; exhausted = true; }
+  } else if (regenWait > 0) {
+    regenWait -= dt;
+  } else {
+    stam = Math.min(1, stam + dt / S.recover * (hs > 0.3 ? 0.6 : 1));
+  }
+  if (exhausted && stam >= 0.35) exhausted = false;
+  const targetFat = exhausted ? 1 : Math.max(0, 1 - stam) * (running ? 1 : 0.85);
+  fatigue += (targetFat - fatigue) * Math.min(1, dt * (targetFat > fatigue ? 1.2 : 0.35));
+  stamBar.style.width = (stam * 100).toFixed(1) + '%';
+  stamEl.classList.toggle('tired', exhausted);
+  stamEl.style.opacity = (stam < 0.995 || exhausted) ? 1 : 0;
+
+  // Andningen blir snabbare och djupare ju tröttare du är
+  breathPh += dt * (1.6 + fatigue * 3.2);
+  const br = Math.floor(breathPh / Math.PI);
+  if (br !== lastBreath) { lastBreath = br; if (fatigue > 0.3) pant((fatigue - 0.3) / 0.7, br % 2 === 0); }
+
+  // Huvudets rörelse följer stegen: upp och ned per steg, sida till sida per stegpar
+  if (P.ground) P.bob += hs * dt * (Math.PI * 2 / (running ? STRIDE * 1.5 : STRIDE));
+  const amt = P.ground ? Math.min(hs / S.speed, running ? 1.7 : 1) : 0;
+  const stepN = Math.floor(P.bob / Math.PI);
+  if (stepN !== lastStep) { lastStep = stepN; if (amt > 0.3) footstep(0.6 + amt * 0.4); }
+  const up = Math.abs(Math.sin(P.bob)) * 0.045 * amt * SH;
+  const side = Math.sin(P.bob) * 0.03 * amt * S.sway;
+  // Kameran följer markens knölar, men knäna dämpar de minsta ryckarna
+  if (camY === null) camY = P.pos.y;
+  if (!P.ground) camY = P.pos.y; else camY += (P.pos.y - camY) * Math.min(1, dt * 16);
+  const breathe = Math.sin(breathPh) * (0.006 + fatigue * 0.03) * S.breath;
+
+  // Skakning i luften: kroppen är ostadig tills fötterna når marken igen
+  airAmt += ((P.ground ? 0 : 1) - airAmt) * Math.min(1, dt * (P.ground ? 10 : 5));
+  jumpKick += (0 - jumpKick) * Math.min(1, dt * 6);
+  kickRoll += (0 - kickRoll) * Math.min(1, dt * 4);
+  kickYaw += (0 - kickYaw) * Math.min(1, dt * 4);
+  // Lutning när du vrider: huvudet lutar in i svängen, mer ju snabbare du vrider
+  const turnRate = dt > 0 ? turnAcc / dt : 0; turnAcc = 0;
+  const tiltT = Math.max(-0.08, Math.min(0.08, turnRate * 0.018)) * S.turnTilt;
+  camTilt += (tiltT - camTilt) * Math.min(1, dt * 7);
+  const AS = S.airShake * airAmt * JV.amp;
+  const tt = time * JV.fm + JV.ph;
+  const jx = (Math.sin(tt * 13.1) + Math.sin(tt * 21.7 + 1.3) * 0.6) * 0.012 * AS;
+  const jy = (Math.sin(tt * 17.3 + 2.1) + Math.sin(tt * 27.9) * 0.5) * 0.010 * AS;
+  const jr = (Math.sin(tt * 11.2 + 0.7) + Math.sin(tt * 19.4 + 2.4) * 0.6) * 0.012 * AS + JV.lean * airAmt * S.airShake;
+  const kick = jumpKick * 0.035 * S.airShake;
+
+  camera.position.set(
+    P.pos.x + c * (side + jx),
+    camY + EYE - 0.03 * amt * SH + up + breathe + landPos + jy,
+    P.pos.z - s * (side + jx)
+  );
+  camera.rotation.set(
+    P.pitch + Math.sin(P.bob * 2) * 0.004 * amt * SH + Math.sin(breathPh + 1) * (0.0015 + fatigue * 0.008) * S.breath + jy * 0.6 - kick - landNod,
+    P.yaw + jx * 0.4 + kickYaw * S.airShake,
+    -Math.sin(P.bob) * 0.007 * amt * S.sway + jr + kickRoll * S.airShake + landRoll + camTilt
+  );
+}
+
+// ---------- Inställningar ----------
+const DEFS = [
+  { g: 'Kamera' },
+  { id: 'fov', label: 'Synfält (FOV)', min: 50, max: 110, step: 1, def: 72, f: v => v + '°' },
+  { id: 'sens', label: 'Muskänslighet', min: 0.2, max: 3, step: 0.05, def: 1, f: v => v.toFixed(2) + '×' },
+  { id: 'blur', label: 'Suddighet vid vridning', min: 0, max: 2, step: 0.05, def: 0.6, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'edgeBlur', label: 'Suddiga kanter när du springer', min: 0, max: 3, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'shake', label: 'Kameraskakning (gång, landning)', min: 0, max: 3, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'turnTilt', label: 'Kameralutning när du vrider', min: 0, max: 3, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'airMouse', label: 'Musfart i luften', min: 0, max: 1, step: 0.05, def: 0.3, f: v => v >= 1 ? 'Normal' : (v ? Math.round(v * 100) + ' %' : 'Låst') },
+  { id: 'airShake', label: 'Skakning i luften (hopp)', min: 0, max: 3, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'jumpVar', label: 'Variation i hopprörelser', min: 0, max: 2, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'sway', label: 'Sidogung och lutning', min: 0, max: 3, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'breath', label: 'Andning', min: 0, max: 3, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'eye', label: 'Ögonhöjd', min: 0.8, max: 2.4, step: 0.05, def: 1.7, f: v => v.toFixed(2) + ' m' },
+  { g: 'Rörelse' },
+  { id: 'mode', label: 'Rörelsestil', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'CS' : 'Realistisk' },
+  { g: 'Hårkors' },
+  { id: 'xhSpeed', label: 'Hur snabbt hårkorset drar ihop sig', min: 0.5, max: 4, step: 0.1, def: 2, f: v => v.toFixed(1) + '×' },
+  { g: 'Hitmarker' },
+  { id: 'hitmark', label: 'Hitmarker', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
+  { id: 'hitSound', label: 'Träffljud', min: 0, max: 1.5, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { g: 'Bot' },
+  { id: 'botOn', label: 'Bot', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
+  { id: 'botLevel', label: 'Svårighet', min: 0, max: 2, step: 1, def: 1, f: v => ['Lätt', 'Normal', 'Svår'][v] },
+  { g: 'Vapen' },
+  { id: 'gunVol', label: 'Skottvolym', min: 0, max: 1.5, step: 0.05, def: 0.8, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'tracers', label: 'Synliga kulbanor', min: 0, max: 1, step: 0.05, def: 0.6, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'duckAcc', label: 'Spridning när du hukar', min: 0.3, max: 1, step: 0.05, def: 0.6, f: v => Math.round(v * 100) + ' % av stående' },
+  { id: 'wallbang', label: 'Skjuta igenom lådor (wallbang)', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
+  { id: 'recoil', label: 'Rekylstyrka (100 % = som 1.6)', min: 0, max: 1.2, step: 0.05, def: 0.65, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
+  { id: 'spreadK', label: 'Spridning (100 % = som 1.6)', min: 0, max: 1.2, step: 0.05, def: 0.7, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
+  { id: 'vmKick', label: 'Vapnets rörelse när du skjuter', min: 0, max: 1.5, step: 0.05, def: 0.7, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'vmScale', label: 'Vapnets storlek i bild', min: 0.4, max: 1, step: 0.01, def: 0.68, f: v => Math.round(v * 100) + ' %' },
+  { id: 'vmBob', label: 'Vapnet gungar när du går', min: 0, max: 2, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'vmFlash', label: 'Mynningsflamma', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
+  { g: 'CS-läge' },
+  { id: 'csPreset', label: 'Spel att efterlikna', min: 0, max: 1, step: 1, def: 1, f: v => CS_PRESETS[v].name },
+  { id: 'csSens', label: 'Muskänslighet (samma tal som i CS)', min: 0.1, max: 10, step: 0.01, def: 2, f: v => v.toFixed(2) },
+  { id: 'wheelJump', label: 'Scrollhjulet', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'Hopp (bunnyhopp)' : 'Ändrar synfält' },
+  { id: 'csSpeed', label: 'Maxfart (enheter/s, kniv = 250)', min: 100, max: 450, step: 1, def: 280, f: v => v + ' (' + (v * CS_U).toFixed(2) + ' m/s)' },
+  { id: 'csAccel', label: 'sv_accelerate', min: 1, max: 15, step: 0.1, def: 5.5, f: v => v.toFixed(1) },
+  { id: 'csAirAccel', label: 'sv_airaccelerate', min: 0, max: 150, step: 1, def: 12, f: v => v },
+  { id: 'csFriction', label: 'sv_friction', min: 1, max: 10, step: 0.1, def: 5.2, f: v => v.toFixed(1) },
+  { id: 'csStop', label: 'sv_stopspeed', min: 25, max: 200, step: 1, def: 80, f: v => v },
+  { id: 'csJump', label: 'Hopphöjd (enheter, låda = 64)', min: 20, max: 100, step: 1, def: 56, f: v => v + ' (' + (v * CS_U).toFixed(2) + ' m)' },
+  { id: 'csBhop', label: 'Bunnyhoppsskydd', min: 1, max: 3, step: 0.05, def: 3, f: v => v >= 3 ? 'Av' : 'Över ' + Math.round(v * 100) + ' % av maxfart' },
+  { g: 'Realistiskt läge' },
+  { id: 'speed', label: 'Gånghastighet', min: 0.5, max: 8, step: 0.1, def: 2.2, f: v => v.toFixed(1) + ' m/s' },
+  { id: 'runSpeed', label: 'Springhastighet', min: 1, max: 14, step: 0.1, def: 5, f: v => v.toFixed(1) + ' m/s' },
+  { id: 'stamina', label: 'Uthållighet (så länge du orkar springa)', min: 2, max: 60, step: 1, def: 9, f: v => v + ' s' },
+  { id: 'recover', label: 'Återhämtning (tid till full ork)', min: 2, max: 60, step: 1, def: 14, f: v => v + ' s' },
+  { id: 'stride', label: 'Steglängd', min: 0.5, max: 2, step: 0.05, def: 1, f: v => Math.round(v * 100) + ' %' },
+  { id: 'inertia', label: 'Tröghet (tung kropp)', min: 0, max: 0.95, step: 0.01, def: 0.78, f: v => Math.round(v * 100) + ' %' },
+  { id: 'jump', label: 'Hopphöjd', min: 0, max: 3, step: 0.05, def: 0.5, f: v => v ? v.toFixed(2) + ' m' : 'Av' },
+  { id: 'runJump', label: 'Kraft i springhopp', min: 0, max: 3, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'jumpCd', label: 'Väntetid mellan hopp (efter landning)', min: 0, max: 3, step: 0.05, def: 0.7, f: v => v ? v.toFixed(2) + ' s' : 'Ingen' },
+  { id: 'leapCd', label: 'Väntetid efter springhopp', min: 0, max: 5, step: 0.05, def: 1.8, f: v => v ? v.toFixed(2) + ' s' : 'Ingen' },
+  { id: 'gravity', label: 'Gravitation', min: 2, max: 40, step: 0.1, def: 19.6, f: v => v.toFixed(1) + ' m/s²' },
+  { id: 'airCtl', label: 'Styrning i luften', min: 0, max: 1, step: 0.01, def: 0.1, f: v => Math.round(v * 100) + ' %' },
+  { g: 'Grafik och prestanda' },
+  { id: 'scale', label: 'Upplösning', min: 0.4, max: 1, step: 0.05, def: 1, f: v => Math.round(v * 100) + ' %' },
+  { id: 'shadows', label: 'Skuggor', min: 0, max: 2, step: 1, def: 2, f: v => ['Av', 'Låg', 'Hög'][v] },
+  { id: 'shadowDist', label: 'Skuggavstånd', min: 15, max: 60, step: 1, def: 32, f: v => v + ' m' },
+  { id: 'fps', label: 'Visa bilder per sekund (FPS)', min: 0, max: 1, step: 1, def: 0, f: v => v ? 'På' : 'Av' },
+  { g: 'Ljud' },
+  { id: 'steps', label: 'Fotstegsvolym', min: 0, max: 1.5, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
+  { id: 'pant', label: 'Flåsljud när du är trött', min: 0, max: 1.5, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' }
+];
+let qualityDirty = true;
+const S = {};
+DEFS.forEach(d => { if (d.id) S[d.id] = d.def; });
+try {
+  const saved = JSON.parse(localStorage.getItem('skogen-settings') || '{}');
+  // Äldre sparade CS-värden var i meter; släng dem så att de nya standardvärdena används
+  if (saved.csSpeed === 250) delete saved.csSpeed; // gamla standardfarten: använd den nya, lite snabbare
+  if (typeof saved.csSpeed === 'number' && saved.csSpeed < 20) {
+    for (const k of ['csSpeed', 'csJump', 'csBhop', 'csAccel', 'csAirAccel', 'csFriction']) delete saved[k];
+  }
+  DEFS.forEach(d => { if (d.id && typeof saved[d.id] === 'number') S[d.id] = Math.max(d.min, Math.min(d.max, saved[d.id])); });
+} catch (e) {}
+
+const setEl = document.getElementById('settings');
+setEl.innerHTML = DEFS.map(d => d.g
+  ? `<div class="grp">${d.g}</div>`
+  : `<div class="row"><label for="s-${d.id}">${d.label}</label><output id="o-${d.id}"></output>
+     <input type="range" id="s-${d.id}" min="${d.min}" max="${d.max}" step="${d.step}"></div>`).join('');
+
+function applySettings() {
+  camera.fov = S.fov; camera.updateProjectionMatrix();
+  DEFS.forEach(d => {
+    if (!d.id) return;
+    document.getElementById('s-' + d.id).value = S[d.id];
+    document.getElementById('o-' + d.id).textContent = d.f(S[d.id]);
+  });
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { try { localStorage.setItem('skogen-settings', JSON.stringify(S)); } catch (e) {} }, 300);
+}
+let saveTimer = 0;
+DEFS.forEach(d => {
+  if (!d.id) return;
+  document.getElementById('s-' + d.id).addEventListener('input', e => {
+    S[d.id] = +e.target.value;
+    if (d.id === 'csPreset') { // ladda spelets värden
+      const pr = CS_PRESETS[S.csPreset];
+      S.csSpeed = pr.speed; S.csAccel = pr.accel; S.csAirAccel = pr.air; S.csFriction = pr.fric;
+      S.csStop = pr.stop; S.csJump = pr.jump; S.csBhop = pr.bhop;
+    }
+    if (['scale', 'shadows', 'shadowDist', 'fps'].includes(d.id)) qualityDirty = true; // bara grafikreglage bygger om bilden
+    applySettings();
+  });
+});
+document.getElementById('reset').addEventListener('click', () => {
+  DEFS.forEach(d => { if (d.id) S[d.id] = d.def; }); qualityDirty = true; applySettings();
+});
+addEventListener('wheel', e => {
+  if (!playing) return;
+  e.preventDefault();
+  if (S.mode === 1 && S.wheelJump) { csJumpNow(); return; } // scrollhopp, som i CS
+  S.fov = Math.max(50, Math.min(110, S.fov + Math.sign(e.deltaY) * 2)); applySettings();
+}, { passive: false });
+applySettings();
+
+// ---------- Suddighet vid vridning (efterbehandling) ----------
+const rt = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+const blurMat = new THREE.ShaderMaterial({
+  uniforms: { tex: { value: rt.texture }, dir: { value: new THREE.Vector2() }, edge: { value: 0 }, aspect: { value: 1 } },
+  depthTest: false, depthWrite: false,
+  vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.0,1.0);}',
+  fragmentShader: [
+    'uniform sampler2D tex;uniform vec2 dir;uniform float edge;uniform float aspect;varying vec2 vUv;',
+    'void main(){',
+    // Kantsuddighet: suddas utåt från mitten, mest ute vid kanterna, mitten förblir skarp
+    'vec2 c=vUv-0.5;float r=length(vec2(c.x*aspect,c.y))/(0.5*length(vec2(aspect,1.0)));',
+    'float mask=smoothstep(0.28,0.95,r);',
+    'vec2 rad=c*edge*0.09*mask;',
+    'vec4 acc=vec4(0.0);',
+    'for(int i=0;i<16;i++){float t=float(i)/15.0-0.5;acc+=texture2D(tex,vUv+dir*t+rad*t);}',
+    'vec4 col=acc/16.0;',
+    'col.rgb*=1.0-edge*0.22*mask*mask;', // lite mörkare kanter, tunnelseende
+    'gl_FragColor=col;}'
+  ].join('')
+});
+const postScene = new THREE.Scene();
+const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blurMat));
+const blurDir = new THREE.Vector2();
+let edgeAmt = 0;
+let prevYaw = P.yaw, prevPitch = P.pitch;
+
+// ---------- Kompass ----------
+// Norr är -Z i världen, öster är +X. Kursen räknas medurs från norr.
+const cmp = document.getElementById('compass'), cx2 = cmp.getContext('2d');
+let compassOn = true;
+{
+  const d = Math.min(devicePixelRatio || 1, 2);
+  cmp.width = 400 * d; cmp.height = 52 * d; cx2.scale(d, d);
+}
+addEventListener('keydown', e => { if (e.code === 'KeyN' && playing) compassOn = !compassOn; });
+const DIRS = ['N', 'NO', 'O', 'SO', 'S', 'SV', 'V', 'NV'];
+let shownHead = null;
+function drawCompass() {
+  cmp.classList.toggle('on', playing && compassOn);
+  if (!playing || !compassOn) return;
+  let head = ((-P.yaw * 180 / Math.PI) % 360 + 360) % 360;
+  // Nålen svänger in lite mjukt, som en riktig kompass
+  if (shownHead === null) shownHead = head;
+  let diff = ((head - shownHead + 540) % 360) - 180;
+  shownHead = (shownHead + diff * 0.25 + 360) % 360;
+  const Wd = 400, Hd = 52, mid = Wd / 2, span = 120, pxPerDeg = Wd / span;
+  cx2.clearRect(0, 0, Wd, Hd);
+  // Bakgrund som tonar ut mot kanterna
+  const grad = cx2.createLinearGradient(0, 0, Wd, 0);
+  grad.addColorStop(0, 'rgba(12,24,15,0)'); grad.addColorStop(0.18, 'rgba(12,24,15,.55)');
+  grad.addColorStop(0.82, 'rgba(12,24,15,.55)'); grad.addColorStop(1, 'rgba(12,24,15,0)');
+  cx2.fillStyle = grad; cx2.fillRect(0, 4, Wd, 30);
+  cx2.textAlign = 'center'; cx2.textBaseline = 'middle';
+  const start = Math.floor((shownHead - span / 2) / 5) * 5;
+  for (let a = start; a <= shownHead + span / 2; a += 5) {
+    const x = mid + (a - shownHead) * pxPerDeg;
+    const fade = 1 - Math.min(1, Math.abs(x - mid) / mid) ** 2;
+    const deg = ((a % 360) + 360) % 360;
+    cx2.globalAlpha = fade;
+    if (deg % 45 === 0) {
+      const lab = DIRS[deg / 45];
+      cx2.fillStyle = lab === 'N' ? '#ff6a4d' : '#f3efe2';
+      cx2.font = (lab.length === 1 ? '700 17px ' : '700 13px ') + 'Bitter, Georgia, serif';
+      cx2.fillText(lab, x, 19);
+    } else {
+      cx2.fillStyle = 'rgba(243,239,226,.85)';
+      const big = deg % 15 === 0;
+      cx2.fillRect(x - 0.5, big ? 12 : 15, 1, big ? 14 : 8);
+      if (big) { cx2.font = '500 9px Bitter, Georgia, serif'; cx2.fillText(deg, x, 31); }
+    }
+  }
+  cx2.globalAlpha = 1;
+  // Mittmarkering och kursen i grader
+  cx2.fillStyle = '#e8a33a';
+  cx2.beginPath(); cx2.moveTo(mid - 6, 2); cx2.lineTo(mid + 6, 2); cx2.lineTo(mid, 9); cx2.closePath(); cx2.fill();
+  cx2.font = '700 12px Bitter, Georgia, serif';
+  cx2.fillText(Math.round(shownHead) % 360 + '°', mid, 44);
+}
+
+// ---------- Vapen (AK-47 och Glock-18, som i CS 1.6) ----------
+// Värdena följer CS 1.6: eldhastighet, magasin, spridning som beror på om du står still, rör dig,
+// hukar eller är i luften, och rekylen ("punchangle") som sparkar upp sikten och sjunker tillbaka.
+const D2R = Math.PI / 180;
+const WEAPONS = {
+  ak: {
+    name: 'AK-47', clip: 30, reserve: 90, maxClip: 30, cycle: 0.0955, auto: true,
+    reload: 2.45, deploy: 0.75, speed: 221, damage: 36
+  },
+  glock: {
+    name: 'Glock-18', clip: 20, reserve: 120, maxClip: 20, cycle: 0.15, auto: false,
+    reload: 2.2, deploy: 0.75, speed: 250, damage: 25
+  }
+};
+WEAPONS.knife = { name: 'Kniv', clip: 0, reserve: 0, maxClip: 0, cycle: 0.4, auto: false, reload: 0, deploy: 0.75, speed: 262, melee: true };
+const WS = { // vapnets tillstånd
+  cur: 'ak', state: 'draw', t: 0, next: 0, time: 0,
+  shots: 0, decTime: 0, delayFire: false, dir: 1,
+  glockAcc: 0.9, glockLast: -10, burst: false, burstLeft: 0, burstNext: 0,
+  fireHeld: false, firePressed: false, altPressed: false, punchX: 0, punchY: 0, slashSide: 1,
+  kick: 0, flash: 0, slide: 0, reloadSlideBack: false, emptyLock: false
+};
+const weaponSpeedK = () => WEAPONS[WS.cur].speed / 250;
+
+// ----- Förstapersonsmodeller -----
+const vmScene = new THREE.Scene();
+const vmCam = new THREE.PerspectiveCamera(74, innerWidth / innerHeight, 0.01, 10);
+vmScene.add(new THREE.HemisphereLight(0xfff4e2, 0x4d4334, 0.8));
+{ const l = new THREE.DirectionalLight(0xfff0d2, 0.75); l.position.set(0.6, 1, 0.4); vmScene.add(l); }
+const LM = c => new THREE.MeshLambertMaterial({ color: c });
+const BX = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+const CYZ = (r, l, seg = 10) => { const g = new THREE.CylinderGeometry(r, r, l, seg); g.rotateX(Math.PI / 2); return g; };
+function part(parent, geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); parent.add(m); return m;
+}
+const mMetal = LM(0x2b2b2d), mMetal2 = LM(0x3d3d40), mWood = LM(0x7d4a22), mWoodD = LM(0x5a3418),
+  mPoly = LM(0x1d1d1f), mGlove = LM(0x2b2e27), mSleeve = LM(0x4b5340), mBlack = LM(0x050505);
+// Mynningsflamma: stjärnformad, additiv
+const flashTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,250,220,1)'); gr.addColorStop(0.25, 'rgba(255,200,90,.9)'); gr.addColorStop(1, 'rgba(255,120,20,0)');
+  g.fillStyle = gr;
+  g.beginPath();
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, r = i % 2 ? 22 : 64; g.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r); }
+  g.closePath(); g.fill();
+  return new THREE.CanvasTexture(c);
+})();
+function makeFlash(parent, x, y, z, size) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
+    new THREE.MeshBasicMaterial({ map: flashTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  m.position.set(x, y, z); m.visible = false; parent.add(m);
+  const side = m.clone(); side.rotation.y = Math.PI / 2; side.scale.set(1.6, 0.5, 1); m.add(side);
+  return m;
+}
+
+// AK-47
+const akRoot = new THREE.Group(), ak = new THREE.Group(); akRoot.add(ak); vmScene.add(akRoot);
+part(ak, BX(0.05, 0.065, 0.32), mMetal, 0, 0, 0);                 // låda
+part(ak, BX(0.046, 0.022, 0.28), mMetal2, 0, 0.04, 0.01);         // stoftlock
+part(ak, BX(0.03, 0.02, 0.04), mMetal, 0, 0.05, -0.15);           // bakre sikte
+part(ak, CYZ(0.013, 0.27), mMetal, 0, 0.04, -0.29);               // gasrör
+part(ak, BX(0.05, 0.034, 0.17), mWood, 0, 0.042, -0.25);          // övre handskydd
+part(ak, BX(0.056, 0.05, 0.2), mWood, 0, -0.005, -0.27);          // undre handskydd
+part(ak, CYZ(0.011, 0.32), mMetal, 0, 0.012, -0.5);               // pipa
+part(ak, BX(0.012, 0.05, 0.02), mMetal, 0, 0.04, -0.6);           // korn
+part(ak, CYZ(0.016, 0.05), mMetal2, 0, 0.012, -0.665);            // mynning
+part(ak, BX(0.008, 0.006, 0.06), mMetal, 0, -0.05, 0.04);         // varbygel
+part(ak, BX(0.034, 0.1, 0.042), mWoodD, 0, -0.08, 0.09, -0.3);    // pistolgrepp
+part(ak, BX(0.042, 0.065, 0.32), mWood, 0, -0.025, 0.31, 0.07);   // kolv
+const akHandle = part(ak, BX(0.022, 0.013, 0.013), mMetal2, 0.033, 0.022, -0.05); // laddhandtag
+const akMag = new THREE.Group(); akMag.position.set(0, -0.04, -0.075); ak.add(akMag);
+part(akMag, BX(0.032, 0.09, 0.07), mMetal, 0, -0.04, 0, 0.12);
+part(akMag, BX(0.032, 0.085, 0.07), mMetal, 0, -0.118, -0.022, 0.32);
+part(akMag, BX(0.032, 0.08, 0.07), mMetal, 0, -0.19, -0.06, 0.55);
+const akFlash = makeFlash(ak, 0, 0.012, -0.72, 0.22);
+// Händer
+part(ak, BX(0.062, 0.09, 0.07), mGlove, 0.012, -0.085, 0.1, -0.3);                     // höger hand på greppet
+part(ak, BX(0.08, 0.08, 0.36), mSleeve, 0.05, -0.19, 0.27, -0.55, 0.12);               // höger underarm
+const akLeft = new THREE.Group(); akLeft.position.set(0, -0.035, -0.27); ak.add(akLeft);
+part(akLeft, BX(0.075, 0.05, 0.095), mGlove, -0.008, -0.01, 0);                         // vänster hand under handskyddet
+part(akLeft, BX(0.08, 0.08, 0.38), mSleeve, -0.11, -0.1, 0.13, -0.35, -0.7);           // vänster underarm
+
+// Glock-18
+const glRoot = new THREE.Group(), gl = new THREE.Group(); glRoot.add(gl); vmScene.add(glRoot);
+const glSlide = new THREE.Group(); gl.add(glSlide);
+part(glSlide, BX(0.029, 0.031, 0.19), mPoly, 0, 0.022, -0.06);
+part(glSlide, BX(0.006, 0.008, 0.006), mMetal2, 0, 0.041, -0.145);  // korn
+part(glSlide, BX(0.02, 0.008, 0.008), mMetal2, 0, 0.041, 0.025);    // sikte
+part(glSlide, BX(0.004, 0.012, 0.05), mBlack, 0.0148, 0.024, -0.02); // utkastaröppning
+part(gl, CYZ(0.0065, 0.012), mBlack, 0, 0.022, -0.152);
+part(gl, BX(0.027, 0.02, 0.17), mPoly, 0, -0.003, -0.055);
+part(gl, BX(0.029, 0.11, 0.05), mPoly, 0, -0.062, 0.018, -0.25);
+part(gl, BX(0.006, 0.004, 0.045), mPoly, 0, -0.03, -0.045);
+const glMag = new THREE.Group(); glMag.position.set(0, -0.06, 0.018); glMag.rotation.x = -0.25; gl.add(glMag);
+part(glMag, BX(0.031, 0.012, 0.055), mMetal, 0, -0.058, 0);
+const glFlash = makeFlash(gl, 0, 0.022, -0.17, 0.14);
+part(gl, BX(0.058, 0.08, 0.066), mGlove, 0.012, -0.062, 0.022, -0.25);
+part(gl, BX(0.08, 0.08, 0.36), mSleeve, 0.06, -0.19, 0.19, -0.75, 0.1);
+const glLeft = new THREE.Group(); glLeft.position.set(-0.03, -0.07, 0.005); gl.add(glLeft);
+part(glLeft, BX(0.05, 0.075, 0.062), mGlove, 0, 0, 0, -0.25);
+part(glLeft, BX(0.08, 0.08, 0.36), mSleeve, -0.07, -0.13, 0.16, -0.75, -0.35);
+
+// Kniv
+const knRoot = new THREE.Group(), kn = new THREE.Group(); knRoot.add(kn); vmScene.add(knRoot);
+const mBlade = new THREE.MeshPhongMaterial({ color: 0xc4c8ce, specular: 0xffffff, shininess: 90 });
+part(kn, BX(0.01, 0.034, 0.19), mBlade, 0, 0.012, -0.135);
+part(kn, BX(0.008, 0.024, 0.05), mBlade, 0, 0.02, -0.245, 0.35);       // spets
+part(kn, BX(0.03, 0.05, 0.009), mMetal2, 0, 0.004, -0.035);            // parerplåt
+part(kn, BX(0.024, 0.03, 0.11), mPoly, 0, 0, 0.022);                   // handtag
+part(kn, BX(0.062, 0.075, 0.085), mGlove, 0.008, -0.012, 0.03);        // hand
+part(kn, BX(0.08, 0.08, 0.36), mSleeve, 0.05, -0.12, 0.2, -0.45, 0.15); // underarm
+const knDummy = new THREE.Group(); kn.add(knDummy);
+const knFlash = new THREE.Mesh(); knFlash.visible = false;
+knRoot.visible = false;
+const VM = {
+  ak: { root: akRoot, gun: ak, base: [0.115, -0.118, -0.25], rotY: 0.035, mag: akMag, magHome: akMag.position.clone(), left: akLeft, leftHome: akLeft.position.clone(), flash: akFlash },
+  glock: { root: glRoot, gun: gl, base: [0.085, -0.095, -0.27], rotY: 0.03, mag: glMag, magHome: glMag.position.clone(), left: glLeft, leftHome: glLeft.position.clone(), flash: glFlash },
+  knife: { root: knRoot, gun: kn, base: [0.1, -0.11, -0.25], rotY: 0.25, mag: knDummy, magHome: new THREE.Vector3(), left: new THREE.Group(), leftHome: new THREE.Vector3(), flash: knFlash }
+};
+glRoot.visible = false;
+
+// En ljuskälla i världen som blinkar till när man skjuter
+const muzzleLight = new THREE.PointLight(0xffc070, 0, 7, 2);
+scene.add(muzzleLight);
+
+// ----- HUD -----
+const hud = document.createElement('div');
+hud.id = 'hud';
+hud.innerHTML = '<div id="wname"></div><div id="ammo"><b id="aclip">30</b><span>|</span><i id="ares">90</i></div><div id="wmode"></div>';
+document.body.appendChild(hud);
+const xh = document.createElement('div'); xh.id = 'xhair';
+xh.innerHTML = '<i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i>';
+document.body.appendChild(xh);
+const hudCss = document.createElement('style');
+hudCss.textContent = `
+#hud{position:fixed;right:22px;bottom:18px;color:#ffb22e;font:700 14px/1.2 Bitter,Georgia,serif;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none;display:none;font-variant-numeric:tabular-nums}
+#hud #ammo{font-size:30px;opacity:.9;display:flex;gap:10px;align-items:baseline;justify-content:flex-end}
+#hud #ammo span{opacity:.55;font-size:24px}#hud #ammo i{font-style:normal;font-size:22px}
+#hud #wname,#hud #wmode{opacity:.8;font-size:14px}
+#hud.low #aclip{color:#ff4b3a}
+#xhair{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;display:none}
+#xhair i{position:absolute;background:#4cff4c;box-shadow:0 0 1px rgba(0,0,0,.8)}
+#xhair .t,#xhair .b{width:2px;height:8px;left:-1px}
+#xhair .l,#xhair .r{height:2px;width:8px;top:-1px}`;
+document.head.appendChild(hudCss);
+const xParts = [...xh.children];
+const elClip = document.getElementById('aclip'), elRes = document.getElementById('ares'),
+  elName = document.getElementById('wname'), elMode = document.getElementById('wmode');
+let xGap = 5, xShots = 0;
+function updateHud(dt) {
+  const show = playing;
+  hud.style.display = show ? 'block' : 'none';
+  xh.style.display = show ? 'block' : 'none';
+  document.getElementById('cross').style.display = 'none';
+  if (!show) return;
+  const w = WEAPONS[WS.cur];
+  elClip.textContent = w.melee ? '–' : w.clip; elRes.textContent = w.melee ? '' : w.reserve; elName.textContent = w.name;
+  hud.querySelector('#ammo span').style.display = w.melee ? 'none' : '';
+  elMode.textContent = WS.cur === 'glock' ? (WS.burst ? 'Burst (3 skott)' : 'Halvautomat') : '';
+  hud.classList.toggle('low', !w.melee && w.clip <= Math.ceil(w.maxClip * 0.2));
+  // Dynamiskt hårkors som i 1.6: växer när du rör dig, hoppar och skjuter
+  const u = (P.hs || 0) / CS_U;
+  // Skotten vidgar hårkorset direkt, men det drar ihop sig snabbt igen när du slutar skjuta
+  if (WS.shots > xShots) xShots = WS.shots;
+  else xShots = Math.max(WS.shots, xShots - dt * 30 * S.xhSpeed);
+  let tgt = 4 + Math.min(xShots, 12) * 1.1;
+  if (!P.ground) tgt += 14; else if (u > 140) tgt += 7; else if (u > 20) tgt += 3;
+  if (moveState().duck) tgt -= 2;
+  const rate = tgt > xGap ? 30 : 14 * S.xhSpeed; // vidgas snabbt, drar ihop sig i vald takt
+  xGap += (tgt - xGap) * Math.min(1, dt * rate);
+  const g = xGap, L = 8;
+  xParts[0].style.top = (-g - L) + 'px'; xParts[1].style.top = g + 'px';
+  xParts[2].style.left = (-g - L) + 'px'; xParts[3].style.left = g + 'px';
+}
+const crouchHeld = () => !!(keys.ControlLeft || keys.ControlRight || keys.KeyC);
+
+// ----- Ljud -----
+let echoIn = null, gunBus = null;
+function ensureGunAudio() {
+  if (gunBus || !actx) return;
+  gunBus = actx.createDynamicsCompressor();
+  gunBus.threshold.value = -10; gunBus.ratio.value = 6;
+  gunBus.connect(actx.destination);
+  // Kort eko mellan murarna
+  echoIn = actx.createGain();
+  const d = actx.createDelay(1); d.delayTime.value = 0.12;
+  const fb = actx.createGain(); fb.gain.value = 0.32;
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1600;
+  const out = actx.createGain(); out.gain.value = 0.45;
+  echoIn.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); lp.connect(out); out.connect(gunBus);
+}
+function gunSound(kind, volMul = 1, pan = 0) {
+  if (!actx || actx.state !== 'running' || S.gunVol <= 0) return;
+  ensureGunAudio();
+  try {
+    const t = actx.currentTime, big = kind === 'ak', v = S.gunVol * volMul;
+    let out = gunBus;
+    if (pan && actx.createStereoPanner) { out = actx.createStereoPanner(); out.pan.value = pan; out.connect(gunBus); }
+    const src = actx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    src.playbackRate.value = 0.9 + Math.random() * 0.2;
+    const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = big ? 250 : 500;
+    const lp = actx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(big ? 6500 : 8000, t); lp.frequency.exponentialRampToValueAtTime(700, t + (big ? 0.22 : 0.14));
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime((big ? 0.85 : 0.6) * v, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (big ? 0.3 : 0.19));
+    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(out); g.connect(echoIn);
+    src.start(t); src.stop(t + 0.35);
+    const o = actx.createOscillator(); o.type = 'sine';
+    o.frequency.setValueAtTime(big ? 150 : 230, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.13);
+    const og = actx.createGain();
+    og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime((big ? 0.9 : 0.45) * v, t + 0.004);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    o.connect(og); og.connect(out); o.start(t); o.stop(t + 0.2);
+  } catch (e) {}
+}
+function clickSound(freq, vol = 0.3, dur = 0.05, delay = 0) {
+  if (!actx || actx.state !== 'running' || S.gunVol <= 0) return;
+  ensureGunAudio();
+  try {
+    const t = actx.currentTime + delay;
+    const src = actx.createBufferSource(); src.buffer = noiseBuf;
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = 3;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * S.gunVol, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp); bp.connect(g); g.connect(gunBus); src.start(t); src.stop(t + dur + 0.02);
+  } catch (e) {}
+}
+
+// ----- Träffar: kulhål och damm -----
+const holeTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(10,8,6,1)'); gr.addColorStop(0.35, 'rgba(25,20,15,.95)'); gr.addColorStop(0.6, 'rgba(60,50,40,.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const holeMat = new THREE.MeshBasicMaterial({ map: holeTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+const holeGeo = new THREE.PlaneGeometry(0.07, 0.07);
+const holes = []; let holeI = 0;
+for (let i = 0; i < 160; i++) { const m = new THREE.Mesh(holeGeo, holeMat); m.visible = false; scene.add(m); holes.push(m); }
+const dustGeo = new THREE.BoxGeometry(0.03, 0.03, 0.03);
+const dust = [];
+for (let i = 0; i < 48; i++) {
+  const m = new THREE.Mesh(dustGeo, new THREE.MeshBasicMaterial({ color: 0xc8b08a, transparent: true }));
+  m.visible = false; scene.add(m); dust.push({ m, v: new THREE.Vector3(), life: 0 });
+}
+let dustI = 0;
+const _n = new THREE.Vector3(), _p = new THREE.Vector3();
+function impact(point, normal, kind) {
+  point = point.clone(); normal = normal.clone();
+  const h = holes[holeI++ % holes.length];
+  h.position.copy(point).addScaledVector(normal, 0.004);
+  _p.copy(h.position).add(normal); h.lookAt(_p);
+  h.rotation.z = Math.random() * 6.28;
+  h.visible = true;
+  const col = kind === 'wood' ? 0x8a5a2b : kind === 'floor' ? 0xc4ab80 : 0xd2bc92;
+  for (let i = 0; i < 4; i++) {
+    const d = dust[dustI++ % dust.length];
+    d.m.position.copy(point).addScaledVector(normal, 0.03);
+    d.v.copy(normal).multiplyScalar(1 + Math.random() * 1.5);
+    d.v.x += (Math.random() - 0.5) * 1.4; d.v.y += Math.random() * 1.2; d.v.z += (Math.random() - 0.5) * 1.4;
+    d.m.material.color.setHex(col); d.m.material.opacity = 1;
+    d.life = 0.45 + Math.random() * 0.2; d.m.visible = true;
+    d.m.scale.setScalar(0.6 + Math.random());
+  }
+  clickSound(kind === 'wood' ? 900 : 2600, 0.12, 0.06);
+}
+function updateDust(dt) {
+  for (const d of dust) {
+    if (d.life <= 0) continue;
+    d.life -= dt;
+    d.v.y -= 6 * dt;
+    d.m.position.addScaledVector(d.v, dt);
+    d.m.material.opacity = Math.max(0, d.life / 0.5);
+    if (d.life <= 0) d.m.visible = false;
+  }
+}
+// Stråle mot lådor, murar och golv (lådor är raka block)
+function raycastWorld(o, d) {
+  let best = 150, nx = 0, ny = 0, nz = 0, kind = 'stone', box = null, tOut = 0, ex = 0, ey = 0, ez = 0;
+  if (d.y < -1e-6) { const t = -o.y / d.y; if (t > 0 && t < best) { best = t; nx = 0; ny = 1; nz = 0; kind = 'floor'; } }
+  for (const b of boxes) {
+    let t0 = -1e9, t1 = 1e9, ax = -1, sgn = 0, ax1 = -1, sgn1 = 0;
+    const mins = [b.minx, b.base, b.minz], maxs = [b.maxx, b.top, b.maxz], os = [o.x, o.y, o.z], ds = [d.x, d.y, d.z];
+    let ok = true;
+    for (let i = 0; i < 3; i++) {
+      if (Math.abs(ds[i]) < 1e-9) { if (os[i] < mins[i] || os[i] > maxs[i]) { ok = false; break; } continue; }
+      let ta = (mins[i] - os[i]) / ds[i], tb = (maxs[i] - os[i]) / ds[i], s = -1;
+      if (ta > tb) { const tmp = ta; ta = tb; tb = tmp; s = 1; }
+      if (ta > t0) { t0 = ta; ax = i; sgn = s; }
+      if (tb < t1) { t1 = tb; ax1 = i; sgn1 = -s; }
+      if (t0 > t1) { ok = false; break; }
+    }
+    if (!ok || t0 < 0 || t0 >= best) continue;
+    best = t0; nx = ax === 0 ? sgn : 0; ny = ax === 1 ? sgn : 0; nz = ax === 2 ? sgn : 0; kind = b.kind;
+    box = b; tOut = t1; ex = ax1 === 0 ? sgn1 : 0; ey = ax1 === 1 ? sgn1 : 0; ez = ax1 === 2 ? sgn1 : 0;
+  }
+  if (kind === 'floor') box = null;
+  return { t: best, n: _n.set(nx, ny, nz), kind, hit: best < 150, box, tOut, exitN: new THREE.Vector3(ex, ey, ez) };
+}
+
+// ----- Skjuta -----
+const _o = new THREE.Vector3(), _d = new THREE.Vector3(), _r = new THREE.Vector3(), _u = new THREE.Vector3();
+function fireBullet(spread, kind) {
+  camera.updateMatrixWorld();
+  _o.setFromMatrixPosition(camera.matrixWorld);
+  const e = camera.matrixWorld.elements;
+  _r.set(e[0], e[1], e[2]); _u.set(e[4], e[5], e[6]); _d.set(-e[8], -e[9], -e[10]);
+  // CS: två slumptal per axel ger tätare träffar i mitten
+  const sx = (Math.random() - 0.5) + (Math.random() - 0.5), sy = (Math.random() - 0.5) + (Math.random() - 0.5);
+  _d.addScaledVector(_r, sx * spread).addScaledVector(_u, sy * spread).normalize();
+  traceBullet(_o.clone(), _d.clone(), kind);
+}
+// ----- Kulbanor: en kort ljusstrimma som flyger från vapnet till där kulan tar vägen -----
+const tracerGeo = new THREE.BoxGeometry(0.014, 0.014, 1);
+const tracers = [];
+for (let i = 0; i < 40; i++) {
+  const m = new THREE.Mesh(tracerGeo, new THREE.MeshBasicMaterial({ color: 0xffe6a8, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  m.visible = false; m.frustumCulled = false; scene.add(m);
+  tracers.push({ m, a: new THREE.Vector3(), b: new THREE.Vector3(), dist: 0, s: 0, on: false });
+}
+let tracerI = 0;
+const TR_SPEED = 320, TR_LEN = 3.2; // m/s och strimmans längd
+function spawnTracer(from, to) {
+  if (S.tracers <= 0) return;
+  const t = tracers[tracerI++ % tracers.length];
+  t.a.copy(from); t.b.copy(to); t.dist = from.distanceTo(to);
+  if (t.dist < 0.5) return;
+  t.s = 0.4; t.on = true; t.m.visible = true;
+}
+const _ta = new THREE.Vector3(), _tb = new THREE.Vector3(), _td = new THREE.Vector3();
+function updateTracers(dt) {
+  for (const t of tracers) {
+    if (!t.on) continue;
+    t.s += TR_SPEED * dt;
+    const head = Math.min(t.s, t.dist), tail = Math.max(0, t.s - TR_LEN);
+    if (tail >= t.dist) { t.on = false; t.m.visible = false; continue; }
+    _td.subVectors(t.b, t.a).divideScalar(t.dist);
+    _ta.copy(t.a).addScaledVector(_td, tail); _tb.copy(t.a).addScaledVector(_td, head);
+    t.m.position.addVectors(_ta, _tb).multiplyScalar(0.5);
+    t.m.lookAt(_tb);
+    t.m.scale.set(1, 1, Math.max(0.01, head - tail));
+    t.m.material.opacity = S.tracers * 0.9;
+  }
+}
+// Var vapnets mynning ungefär är i världen (vapnet ritas separat, så vi räknar från kameran)
+function muzzleWorld(out) {
+  camera.updateMatrixWorld();
+  const e = camera.matrixWorld.elements;
+  out.setFromMatrixPosition(camera.matrixWorld)
+    .addScaledVector(_r.set(e[0], e[1], e[2]), 0.11 * S.vmScale + 0.02)
+    .addScaledVector(_u.set(e[4], e[5], e[6]), -0.08)
+    .addScaledVector(_td.set(-e[8], -e[9], -e[10]), 0.55);
+  return out;
+}
+
+// Kulan kan gå igenom lådor (wallbang). AK:n klarar två lådor, Glocken en.
+// Den tappar skada för varje låda, mer ju tjockare den är. Ytterväggarna går inte att skjuta igenom.
+const PEN = {
+  ak: { count: 2, wood: 1.3, stone: 0.9, woodLoss: 0.75, stoneLoss: 0.45 },
+  glock: { count: 1, wood: 1.25, stone: 0, woodLoss: 0.55, stoneLoss: 0 }
+};
+function traceBullet(o, d, kind) {
+  const start = o.clone(), dir = d.clone();
+  const end = traceBulletPath(o, d, kind);
+  spawnTracer(muzzleWorld(new THREE.Vector3()), end || start.addScaledVector(dir, 150));
+}
+function traceBulletPath(o, d, kind) {
+  const pen = PEN[kind];
+  let dmg = WEAPONS[kind].damage, travelled = 0, left = S.wallbang ? pen.count : 0;
+  for (let seg = 0; seg < 4; seg++) {
+    const h = raycastWorld(o, d);
+    const bh = hitBot(o, d, h.t, kind);
+    if (bh) {
+      const dist = travelled + bh.t;
+      const hp = o.clone().addScaledVector(d, bh.t);
+      damageBot(dmg * Math.pow(RANGE_MOD[kind], dist / (500 * CS_U)), kind, bh.zone, hp);
+      return hp;
+    }
+    if (!h.hit) return null;
+    const hitP = o.clone().addScaledVector(d, h.t);
+    impact(hitP, h.n, h.kind);
+    // Går den igenom?
+    const b = h.box;
+    if (!b || left <= 0 || b.top >= WALL_H - 0.01) return hitP;
+    const thick = h.tOut - h.t, wood = b.kind === 'wood';
+    const max = wood ? pen.wood : pen.stone;
+    if (thick > max) return hitP;
+    dmg *= (wood ? pen.woodLoss : pen.stoneLoss) * (1 - 0.35 * thick / max);
+    if (dmg < 3) return hitP;
+    left--;
+    // Hål på utgångssidan och vidare
+    const exitP = o.clone().addScaledVector(d, h.tOut);
+    impact(exitP, h.exitN, b.kind);
+    travelled += h.tOut + 0.01;
+    o = exitP.addScaledVector(d, 0.01);
+  }
+  return o;
+}
+// Rekyl i 1.6 ("KickBack"): sikten sparkar uppåt och åt sidan, mer för varje skott i en salva
+function kickBack(upBase, latBase, upMod, latMod, upMax, latMax, dirChange) {
+  let up, lat;
+  if (WS.shots === 1) { up = upBase; lat = latBase; }
+  else { up = upBase + WS.shots * upMod; lat = latBase + WS.shots * latMod; }
+  // Rekylstyrka: 100 % = exakt som 1.6
+  const R = S.recoil; up *= R; lat *= R; upMax *= R; latMax *= R;
+  WS.punchX = Math.max(WS.punchX - up, -upMax);
+  if (WS.dir === 1) WS.punchY = Math.min(WS.punchY + lat, latMax);
+  else WS.punchY = Math.max(WS.punchY - lat, -latMax);
+  if (Math.floor(Math.random() * (dirChange + 1)) === 0) WS.dir = -WS.dir;
+}
+function moveState() {
+  const u = (P.hs || 0) / CS_U;
+  // Hukad = nere i hukat läge och på marken (i CS-läget först när hukningen är klar)
+  const duck = P.ground && (S.mode === 1 ? csDuckT > 0.6 : crouchHeld());
+  return { air: !P.ground, moving: u > 140, anyMove: u > 0.5, duck };
+}
+function shootAK() {
+  const w = WEAPONS.ak, m = moveState();
+  const acc = WS.shots > 0 ? Math.min(1.25, WS.shots ** 3 / 200 + 0.35) : 0.2;
+  let spread = (m.air ? 0.04 + 0.4 * acc : m.moving ? 0.04 + 0.07 * acc : 0.0275 * acc) * S.spreadK;
+  if (m.duck && !m.moving) spread *= S.duckAcc; // hukad: skotten samlas tätare i mitten
+  WS.shots++; WS.delayFire = true;
+  w.clip--;
+  fireBullet(spread, 'ak');
+  if (m.air) kickBack(2.0, 1.0, 0.5, 0.35, 9.0, 6.0, 5);
+  else if (m.duck) kickBack(0.9, 0.35, 0.15, 0.025, 5.5, 1.5, 9); // hukad: mindre rekyl
+  else if (m.anyMove) kickBack(1.5, 0.45, 0.225, 0.05, 6.5, 2.5, 7);
+  else kickBack(1.0, 0.375, 0.175, 0.0375, 5.75, 1.75, 8);
+  afterShot('ak');
+}
+function shootGlock() {
+  const w = WEAPONS.glock, m = moveState();
+  // Pistolens precision: blir sämre om du skjuter snabbt, återhämtar sig om du väntar
+  WS.glockAcc -= (0.325 - (WS.time - WS.glockLast)) * 0.275;
+  WS.glockAcc = Math.max(0.6, Math.min(0.9, WS.glockAcc));
+  const inacc = 1 - WS.glockAcc;
+  let spread = m.air ? 1.0 * inacc : m.moving ? 0.165 * inacc : m.duck ? 0.075 * inacc : 0.1 * inacc;
+  if (WS.burst) spread = m.air ? 1.2 * inacc : m.moving ? 0.185 * inacc : m.duck ? 0.095 * inacc : 0.3 * inacc;
+  spread *= S.spreadK;
+  if (m.duck && !m.moving) spread *= Math.min(1, S.duckAcc + 0.2); // Glocken är redan bättre hukad i 1.6
+  WS.glockLast = WS.time; WS.shots++;
+  w.clip--;
+  fireBullet(spread, 'glock');
+  WS.punchX -= 2 * S.recoil;
+  if (w.clip === 0) WS.emptyLock = true; // slutstycket stannar bakåt när magasinet är tomt
+  afterShot('glock');
+}
+function afterShot(kind) {
+  gunSound(kind);
+  WS.kick = 1; WS.flash = 0.045; WS.slide = 1;
+  WS.state = 'shoot'; WS.t = 0;
+  muzzleLight.intensity = 2.2;
+  const f = VM[kind].flash; f.rotation.z = Math.random() * 6.28; f.scale.setScalar(0.8 + Math.random() * 0.5);
+}
+function startReload() {
+  const w = WEAPONS[WS.cur];
+  if (w.melee || WS.state === 'reload' || WS.state === 'draw' || w.clip >= w.maxClip || w.reserve <= 0) return;
+  WS.state = 'reload'; WS.t = 0; WS.shots = 0; WS.burstLeft = 0;
+  WS.reloadSlideBack = WS.cur === 'glock' && w.clip === 0;
+  const kind = WS.cur;
+  if (kind === 'ak') { clickSound(1100, 0.35, 0.07, 0.5); clickSound(700, 0.3, 0.09, 0.56); clickSound(1500, 0.4, 0.06, 1.5); clickSound(600, 0.45, 0.1, 1.55); }
+  else { clickSound(1300, 0.3, 0.06, 0.4); clickSound(1800, 0.4, 0.05, 1.3); clickSound(800, 0.35, 0.08, 1.33); if (WS.reloadSlideBack) clickSound(2200, 0.45, 0.06, 1.65); }
+}
+let lastWeapon = 'glock'; // vapnet du hade innan (för snabbyte med Q)
+function switchTo(kind) {
+  if (WS.cur === kind || !WEAPONS[kind]) return;
+  if (WS.cur) lastWeapon = WS.cur;
+  WS.cur = kind; WS.state = 'draw'; WS.t = 0; WS.shots = 0; WS.burstLeft = 0;
+  WS.next = WS.time + WEAPONS[kind].deploy;
+  WS.emptyLock = kind === 'glock' && WEAPONS.glock.clip === 0;
+  for (const k in VM) VM[k].root.visible = k === kind;
+  // Ladda vapnet när det dras fram (1.6: AK drar i laddhandtaget, Glock drar i slutstycket)
+  if (kind === 'ak') { clickSound(1200, 0.35, 0.06, 0.35); clickSound(900, 0.35, 0.07, 0.48); }
+  else if (kind === 'glock') { clickSound(1600, 0.3, 0.05, 0.3); clickSound(2100, 0.35, 0.05, 0.42); }
+  else swishSound(0.5, 0.25);
+}
+addEventListener('keydown', e => {
+  if (!playing || e.repeat) return;
+  if (e.code === 'Digit1') switchTo('ak');
+  if (e.code === 'Digit2') switchTo('glock');
+  if (e.code === 'Digit3') switchTo('knife');
+  if (e.code === 'KeyQ') switchTo(lastWeapon); // snabbyte till senaste vapnet, som i CS
+  if (e.code === 'KeyR') startReload();
+});
+document.addEventListener('mousedown', e => {
+  if (!playing || dragMode) return;
+  if (e.button === 0) { WS.fireHeld = true; WS.firePressed = true; }
+  if (e.button === 2) {
+    if (WS.cur === 'glock') { WS.burst = !WS.burst; clickSound(2400, 0.25, 0.04); }
+    else WS.altPressed = true;
+  }
+});
+addEventListener('mouseup', e => { if (e.button === 0) WS.fireHeld = false; });
+addEventListener('contextmenu', e => { if (playing) e.preventDefault(); });
+
+function updateWeapons(dt) {
+  if (!playing) { WS.fireHeld = false; WS.firePressed = false; hud.style.display = 'none'; xh.style.display = 'none'; return; }
+  WS.time += dt; WS.t += dt;
+  const w = WEAPONS[WS.cur];
+
+  if (WS.state === 'draw' && WS.t >= w.deploy) { WS.state = 'idle'; WS.t = 0; }
+  if (WS.state === 'reload' && WS.t >= w.reload) {
+    const n = Math.min(w.maxClip - w.clip, w.reserve);
+    w.clip += n; w.reserve -= n;
+    WS.state = 'idle'; WS.t = 0; WS.emptyLock = false;
+    WS.next = WS.time;
+  }
+  if (WS.state === 'shoot' && WS.t > 0.25) { WS.state = 'idle'; WS.t = 0; }
+  const ready = WS.state === 'idle' || WS.state === 'shoot';
+
+  if (P.dead) { WS.fireHeld = false; WS.firePressed = false; WS.altPressed = false; }
+  if ((WS.state === 'slash' && WS.t > 0.4) || (WS.state === 'stab' && WS.t > 0.9)) { WS.state = 'idle'; WS.t = 0; }
+  if (WS.cur === 'knife') {
+    const kready = WS.state === 'idle' || WS.state === 'slash' || WS.state === 'stab';
+    if (kready && WS.time >= WS.next) {
+      if (WS.fireHeld) knifeAttack(false);
+      else if (WS.altPressed) knifeAttack(true);
+    }
+  } else if (WS.cur === 'ak') {
+    if (WS.fireHeld && ready && WS.time >= WS.next) {
+      if (w.clip > 0) { shootAK(); WS.next = WS.time + w.cycle; }
+      else if (WS.firePressed) {
+        clickSound(3000, 0.3, 0.04); WS.next = WS.time + 0.2;
+        if (w.reserve > 0) startReload();
+      }
+    }
+    // När du släpper avtryckaren återhämtar sig siktet: efter 0,4 s minskar antalet skott i salvan
+    if (!WS.fireHeld) {
+      if (WS.delayFire) { WS.delayFire = false; if (WS.shots > 15) WS.shots = 15; WS.decTime = WS.time + 0.4; }
+      while (WS.shots > 0 && WS.time > WS.decTime) { WS.decTime += 0.0225; WS.shots--; }
+    }
+  } else {
+    if (WS.burstLeft > 0 && WS.time >= WS.burstNext && w.clip > 0) {
+      shootGlock(); WS.burstLeft--; WS.burstNext = WS.time + 0.05;
+    }
+    if (WS.firePressed && ready && WS.time >= WS.next) {
+      if (w.clip > 0) {
+        shootGlock();
+        if (WS.burst) { WS.burstLeft = 2; WS.burstNext = WS.time + 0.05; WS.next = WS.time + 0.5; }
+        else WS.next = WS.time + w.cycle;
+      } else {
+        clickSound(3000, 0.3, 0.04); WS.next = WS.time + 0.2;
+        if (w.reserve > 0) startReload();
+      }
+    }
+    if (WS.time - WS.glockLast > 0.6) WS.shots = 0;
+  }
+  WS.firePressed = false; WS.altPressed = false;
+
+  // Rekylen sjunker tillbaka (1.6: PM_DropPunchAngle)
+  let len = Math.hypot(WS.punchX, WS.punchY);
+  if (len > 0) {
+    const nl = Math.max(0, len - (10 + len * 0.5) * dt);
+    WS.punchX *= nl / len; WS.punchY *= nl / len;
+  }
+  camera.rotation.x -= WS.punchX * D2R;
+  camera.rotation.y += WS.punchY * D2R;
+
+  WS.kick = Math.max(0, WS.kick - dt * 12);
+  WS.flash -= dt;
+  WS.slide = Math.max(0, WS.slide - dt * 16);
+  muzzleLight.intensity = Math.max(0, muzzleLight.intensity - dt * 40);
+  camera.updateMatrixWorld();
+  muzzleLight.position.setFromMatrixPosition(camera.matrixWorld).addScaledVector(_d.set(-camera.matrixWorld.elements[8], -camera.matrixWorld.elements[9], -camera.matrixWorld.elements[10]), 0.8);
+  updateDust(dt);
+  updateTracers(dt);
+  animateViewmodel(dt);
+  updateHud(dt);
+}
+
+// ----- Animationer -----
+const ease = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+const bump = (t, a, b) => ease((t - a) / (b - a)); // 0→1 mellan a och b
+let vmBob = 0, swayX = 0, swayY = 0, lookDX = 0, lookDY = 0;
+function addLookSway(dx, dy) { lookDX += dx; lookDY += dy; }
+function animateViewmodel(dt) {
+  const k = WS.cur, V = VM[k], w = WEAPONS[k];
+  const root = V.root, gun = V.gun;
+  // Gung när du går (1.6 har gung på vapnet även om kameran står still)
+  const hs = P.ground ? (P.hs || 0) : 0;
+  vmBob += hs * dt * 1.9;
+  const bobAmt = Math.min(1, hs / 4.5) * S.vmBob;
+  // Vapnet släpar lite efter när du vrider
+  swayX += (Math.max(-30, Math.min(30, lookDX)) * 0.0004 - swayX) * Math.min(1, dt * 10);
+  swayY += (Math.max(-30, Math.min(30, lookDY)) * 0.0004 - swayY) * Math.min(1, dt * 10);
+  lookDX = 0; lookDY = 0;
+  let px = V.base[0] + Math.sin(vmBob) * 0.008 * bobAmt - swayX;
+  let py = V.base[1] - Math.abs(Math.cos(vmBob)) * 0.007 * bobAmt + swayY + (P.ground ? 0 : 0.008);
+  let pz = V.base[2];
+  let rx = 0, ry = V.rotY, rz = 0;
+  // Rekyl på modellen
+  const kick = WS.kick;
+  pz += kick * (k === 'ak' ? 0.022 : 0.02) * S.vmKick;
+  rx += kick * (k === 'ak' ? 0.035 : 0.08) * S.vmKick;
+  // Dra fram: vapnet kommer upp underifrån
+  if (WS.state === 'draw') {
+    const d = 1 - ease(WS.t / (w.deploy * 0.7));
+    py -= d * 0.22; rx -= d * 0.9; rz += d * 0.3;
+  }
+  // Ladda om
+  const mag = V.mag, left = V.left;
+  mag.position.copy(V.magHome); mag.visible = true; left.position.copy(V.leftHome);
+  if (WS.state === 'reload') {
+    const t = WS.t, T = w.reload;
+    const tilt = bump(t, 0, 0.35) * (1 - bump(t, T - 0.45, T - 0.05));
+    rz += tilt * (k === 'ak' ? 0.42 : 0.25); rx += tilt * 0.12; px -= tilt * 0.03; py += tilt * 0.02;
+    if (k === 'ak') {
+      // Magasinet ut (0,5 s), nytt magasin in (1,0–1,55 s), slag mot magasinet
+      const out = bump(t, 0.45, 0.75), inn = bump(t, 0.95, 1.5);
+      if (t < 0.95) { mag.position.y -= out * 0.35; mag.position.z += out * 0.05; mag.visible = out < 0.98; left.position.y -= out * 0.25; left.position.z += out * 0.15; }
+      else { mag.position.y -= (1 - inn) * 0.3; mag.position.z += (1 - inn) * 0.06; left.position.y -= (1 - inn) * 0.22; left.position.z += (1 - inn) * 0.12 + 0.2 * (1 - bump(t, 1.5, 1.9)); }
+      if (t > 1.5 && t < 1.65) py += Math.sin((t - 1.5) / 0.15 * Math.PI) * 0.012;
+    } else {
+      const out = bump(t, 0.35, 0.6), inn = bump(t, 0.8, 1.3);
+      if (t < 0.8) { mag.position.y -= out * 0.3; mag.visible = out < 0.98; left.position.y -= out * 0.12; }
+      else { mag.position.y -= (1 - inn) * 0.25; left.position.y -= (1 - inn) * 0.12; }
+      if (t > 1.3 && t < 1.42) py += Math.sin((t - 1.3) / 0.12 * Math.PI) * 0.01;
+    }
+  }
+  // Glockens slutstycke: rycker bakåt vid skott, stannar bakåt när den är tom, släpps vid omladdning
+  if (k === 'glock') {
+    let back = WS.slide;
+    if (WS.emptyLock) back = 1;
+    if (WS.state === 'reload' && WS.reloadSlideBack) back = WS.t < 1.6 ? 1 : 1 - bump(WS.t, 1.6, 1.66);
+    if (WS.state === 'draw') back = Math.max(back, bump(WS.t, 0.25, 0.32) * (1 - bump(WS.t, 0.4, 0.46)));
+    glSlide.position.z = back * 0.035;
+  } else {
+    // AK: laddhandtaget dras bakåt när vapnet tas fram
+    let pull = 0;
+    if (WS.state === 'draw') pull = bump(WS.t, 0.3, 0.38) * (1 - bump(WS.t, 0.45, 0.5));
+    akHandle.position.z = -0.05 + pull * 0.09;
+  }
+  // Kniven: hugg från sida till sida (Mus1) och stick framåt (Mus2)
+  if (k === 'knife') {
+    if (WS.state === 'slash') {
+      const t = WS.t, sd = WS.slashSide;
+      const a = bump(t, 0, 0.07), sw = bump(t, 0.07, 0.2), back = bump(t, 0.24, 0.4);
+      const ang = (a * 0.5 - sw * 1.6) * (1 - back);
+      ry += ang * sd; rz += (a * 0.4 - sw * 0.8) * sd * (1 - back);
+      px += (a * 0.04 - sw * 0.11) * sd * (1 - back); py += sw * 0.02 * (1 - back);
+    } else if (WS.state === 'stab') {
+      const t = WS.t, pull = bump(t, 0, 0.18), thrust = bump(t, 0.18, 0.3), back = bump(t, 0.45, 0.85);
+      pz += (pull * 0.06 - thrust * 0.2) * (1 - back); rx += (pull * 0.25 - thrust * 0.45) * (1 - back);
+      px -= thrust * 0.05 * (1 - back); ry += thrust * 0.2 * (1 - back);
+    }
+  }
+  // Storlek i bild: mindre modell som skjuts ut mot hörnet
+  const sc = S.vmScale;
+  root.scale.setScalar(sc);
+  px = px * sc + (1 - sc) * 0.06; py = py * sc - (1 - sc) * 0.035; pz = pz * sc;
+  root.position.set(px, py, pz);
+  root.rotation.set(rx, ry, rz);
+  // Mynningsflamma
+  V.flash.visible = WS.flash > 0 && S.vmFlash > 0;
+}
+
+// ---------- Skada, hälsa och rustning (som i 1.6) ----------
+// Träffzoner: huvud ×4, bröst ×1, mage ×1,25, ben ×0,75. Rustning tar en del av skadan
+// (hur mycket beror på vapnet), och hjälmen skyddar huvudet.
+const ARMOR_RATIO = { ak: 0.775, glock: 0.525, knife: 0.5 };
+const RANGE_MOD = { ak: 0.98, glock: 0.75 };
+const ZONE_MULT = { head: 4, chest: 1, stomach: 1.25, legs: 0.75 };
+function applyDamage(target, dmg, kind, zone) {
+  dmg *= ZONE_MULT[zone] || 1;
+  let hp = dmg;
+  if (target.armor > 0 && zone !== 'legs') {
+    hp = dmg * ARMOR_RATIO[kind];
+    let armorDmg = (dmg - hp) * 0.5;
+    if (armorDmg > target.armor) { hp = dmg - target.armor * 2; armorDmg = target.armor; }
+    target.armor = Math.max(0, target.armor - armorDmg);
+  }
+  target.hp -= Math.round(hp);
+  return Math.round(hp);
+}
+// Stråle mot en stående figur: en lodrät cylinder för kroppen och ett klot för huvudet
+function rayFigure(o, d, fx, fy, fz, height, radius) {
+  const headR = 0.13, headY = fy + height - headR;
+  let best = null;
+  // huvud
+  const ox = o.x - fx, oy = o.y - headY, oz = o.z - fz;
+  const b = ox * d.x + oy * d.y + oz * d.z, c = ox * ox + oy * oy + oz * oz - headR * headR, disc = b * b - c;
+  if (disc >= 0) { const t = -b - Math.sqrt(disc); if (t > 0) best = { t, zone: 'head' }; }
+  // kropp
+  const a2 = d.x * d.x + d.z * d.z;
+  if (a2 > 1e-9) {
+    const bx = o.x - fx, bz = o.z - fz;
+    const B = bx * d.x + bz * d.z, C = bx * bx + bz * bz - radius * radius, D = B * B - a2 * C;
+    if (D >= 0) {
+      const t = (-B - Math.sqrt(D)) / a2;
+      if (t > 0) {
+        const y = o.y + d.y * t - fy, top = height - headR * 2;
+        if (y >= 0 && y <= top && (!best || t < best.t)) {
+          const f = y / top;
+          best = { t, zone: f > 0.62 ? 'chest' : f > 0.45 ? 'stomach' : 'legs' };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+// ---------- Spelaren: hälsa ----------
+P.hp = 100; P.armor = 100; P.dead = false; P.deadT = 0;
+const playerHeight = () => (S.mode === 1 ? S.eye * (1 - 0.4 * csDuck) : S.eye) + 0.12;
+const dmgFlash = document.createElement('div'); dmgFlash.id = 'dmg';
+document.body.appendChild(dmgFlash);
+const hpHud = document.createElement('div'); hpHud.id = 'hphud';
+hpHud.innerHTML = '<span class="hp"><b>+</b><em id="hpv">100</em></span><span class="ar"><b>◈</b><em id="arv">100</em></span>';
+document.body.appendChild(hpHud);
+const scoreHud = document.createElement('div'); scoreHud.id = 'score';
+scoreHud.innerHTML = '<span>Du <b id="scP">0</b></span><i>–</i><span><b id="scB">0</b> Bot</span>';
+document.body.appendChild(scoreHud);
+const feed = document.createElement('div'); feed.id = 'feed'; document.body.appendChild(feed);
+const banner = document.createElement('div'); banner.id = 'banner'; document.body.appendChild(banner);
+const botCss = document.createElement('style');
+botCss.textContent = `
+#dmg{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(160,0,0,0) 45%,rgba(170,0,0,.55) 100%);opacity:0}
+#hphud{position:fixed;left:22px;bottom:18px;color:#ffb22e;font:700 28px/1 Bitter,Georgia,serif;display:none;gap:22px;text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none;font-variant-numeric:tabular-nums}
+#hphud span{display:flex;gap:6px;align-items:center}#hphud b{font-size:22px;opacity:.85}#hphud em{font-style:normal}
+#hphud.low .hp{color:#ff4b3a}
+#score{position:fixed;left:50%;top:70px;transform:translateX(-50%);color:#fff;font:700 18px/1 Bitter,Georgia,serif;display:none;gap:12px;background:rgba(10,14,10,.45);padding:7px 16px;border-radius:8px;pointer-events:none;text-shadow:0 1px 2px #000}
+#score b{color:#ffb22e}#score i{opacity:.6;font-style:normal}
+#feed{position:fixed;right:16px;top:44px;display:flex;flex-direction:column;gap:4px;align-items:flex-end;pointer-events:none}
+#feed div{background:rgba(10,14,10,.55);color:#fff;font:600 14px/1 Bitter,Georgia,serif;padding:6px 10px;border-radius:6px;transition:opacity .5s}
+#feed .hs{color:#ffb22e}
+#banner{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);color:#fff;font:700 30px/1.2 Bitter,Georgia,serif;text-align:center;text-shadow:0 2px 6px #000;pointer-events:none;display:none}
+#banner small{display:block;font-size:16px;opacity:.85;font-weight:500;margin-top:6px}`;
+document.head.appendChild(botCss);
+let dmgAlpha = 0;
+function hurtPlayer(dmg, kind, zone, fromX, fromZ) {
+  if (P.dead) return;
+  const taken = applyDamage(P, dmg, kind, zone);
+  dmgAlpha = Math.min(1, dmgAlpha + 0.35 + taken / 120);
+  WS.punchX -= 2.2; WS.punchY += (Math.random() - 0.5) * 1.5; // sikten rycker när du blir träffad
+  clickSound(260, 0.5, 0.12);
+  if (P.hp <= 0) {
+    P.hp = 0; P.dead = true; P.deadT = 0;
+    roundOver(false, zone === 'head');
+  }
+}
+function updatePlayerHud(dt) {
+  dmgAlpha = Math.max(0, dmgAlpha - dt * 1.4);
+  dmgFlash.style.opacity = P.dead ? 0.8 : dmgAlpha;
+  const show = playing;
+  hpHud.style.display = scoreHud.style.display = show ? 'flex' : 'none';
+  if (!show) return;
+  document.getElementById('hpv').textContent = Math.max(0, Math.ceil(P.hp));
+  document.getElementById('arv').textContent = Math.ceil(P.armor);
+  hpHud.classList.toggle('low', P.hp <= 25);
+}
+
+// ---------- Boten ----------
+const BOT_LEVELS = [
+  { name: 'Lätt', react: 0.65, err: 4.5, turn: 260, comp: 0.2, burst: [2, 4], pause: [0.5, 0.9], head: 0.08 },
+  { name: 'Normal', react: 0.38, err: 2.6, turn: 420, comp: 0.5, burst: [3, 6], pause: [0.35, 0.65], head: 0.2 },
+  { name: 'Svår', react: 0.22, err: 1.4, turn: 650, comp: 0.75, burst: [4, 9], pause: [0.25, 0.45], head: 0.4 }
+];
+const BOT_EYE = 1.62, BOT_H = 1.78, BOT_R = 0.3;
+const bot = {
+  x: 0, y: 0, z: 0, yaw: Math.PI, pitch: 0, vx: 0, vz: 0, hp: 100, armor: 100, alive: true,
+  clip: 30, reloadT: 0, next: 0, shots: 0, punchX: 0, punchY: 0, dir: 1, burstLeft: 0, pauseT: 0,
+  seeT: 0, lastSeen: null, alertT: 0, errY: 0, errP: 0, target: null, stuckT: 0, lastDist: 1e9,
+  strafe: 0, strafeT: 0, walk: 0, deadT: 0, aimHead: false, flash: 0
+};
+// Modell: en enkel soldat av block
+const botG = new THREE.Group(); scene.add(botG);
+const bMat = c => new THREE.MeshLambertMaterial({ color: c });
+const bJacket = bMat(0x6a5038), bPants = bMat(0x3a382f), bSkin = bMat(0xc49470), bCap = bMat(0x2a2a26), bBoot = bMat(0x1c1b18), bGun = bMat(0x262626), bGunW = bMat(0x7b4a24);
+function bpart(parent, w, h, d, mat, x, y, z) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
+}
+const hips = new THREE.Group(); hips.position.y = 0.9; botG.add(hips);
+const legL = new THREE.Group(), legR = new THREE.Group();
+legL.position.set(-0.1, 0, 0); legR.position.set(0.1, 0, 0); hips.add(legL, legR);
+for (const lg of [legL, legR]) { bpart(lg, 0.15, 0.82, 0.17, bPants, 0, -0.41, 0); bpart(lg, 0.16, 0.1, 0.26, bBoot, 0, -0.85, -0.04); }
+const torso = new THREE.Group(); torso.position.y = 0.9; botG.add(torso);
+bpart(torso, 0.42, 0.56, 0.24, bJacket, 0, 0.28, 0);
+bpart(torso, 0.44, 0.12, 0.26, bMat(0x4a3826), 0, 0.02, 0); // bälte
+const headG = new THREE.Group(); headG.position.y = 0.66; torso.add(headG);
+bpart(headG, 0.2, 0.24, 0.22, bSkin, 0, 0.12, 0);
+bpart(headG, 0.22, 0.09, 0.24, bCap, 0, 0.255, 0.01);
+bpart(headG, 0.21, 0.05, 0.02, bCap, 0, 0.16, -0.11); // ögonband
+const armsG = new THREE.Group(); armsG.position.set(0, 0.48, 0); torso.add(armsG);
+bpart(armsG, 0.1, 0.1, 0.38, bJacket, 0.2, -0.05, -0.15);
+bpart(armsG, 0.1, 0.1, 0.42, bJacket, -0.14, -0.06, -0.3);
+const botGun = new THREE.Group(); botGun.position.set(0.06, -0.02, -0.38); armsG.add(botGun);
+bpart(botGun, 0.05, 0.07, 0.36, bGun, 0, 0, 0);
+bpart(botGun, 0.05, 0.05, 0.2, bGunW, 0, -0.01, -0.22);
+bpart(botGun, 0.022, 0.022, 0.3, bGun, 0, 0.015, -0.42);
+bpart(botGun, 0.04, 0.06, 0.28, bGunW, 0, -0.02, 0.28);
+bpart(botGun, 0.03, 0.14, 0.06, bGun, 0, -0.1, -0.05);
+const botFlash = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+botFlash.scale.set(0.35, 0.35, 1); botFlash.position.set(0, 0.015, -0.6); botFlash.visible = false; botGun.add(botFlash);
+
+function botLevel() { return BOT_LEVELS[S.botLevel] || BOT_LEVELS[1]; }
+const SPAWN_P = { x: 0, z: ARENA_L / 2 - 3, yaw: 0 }, SPAWN_B = { x: 0, z: -ARENA_L / 2 + 3, yaw: Math.PI };
+function freePoint() { // en slumpad plats på golvet som inte är inne i en låda
+  for (let i = 0; i < 40; i++) {
+    const x = (Math.random() - 0.5) * (ARENA_W - 3), z = (Math.random() - 0.5) * (ARENA_L - 3);
+    if (!boxes.some(b => x > b.minx - 0.7 && x < b.maxx + 0.7 && z > b.minz - 0.7 && z < b.maxz + 0.7)) return { x, z };
+  }
+  return { x: 0, z: 0 };
+}
+function resetBot() {
+  Object.assign(bot, { x: SPAWN_B.x + (Math.random() - 0.5) * 6, y: 0, z: SPAWN_B.z, yaw: SPAWN_B.yaw, pitch: 0, vx: 0, vz: 0,
+    hp: 100, armor: 100, alive: true, clip: 30, reloadT: 0, shots: 0, punchX: 0, punchY: 0, burstLeft: 0, pauseT: 0,
+    seeT: 0, lastSeen: null, alertT: 0, target: freePoint(), stuckT: 0, deadT: 0 });
+  botG.visible = S.botOn > 0;
+  botG.rotation.set(0, bot.yaw, 0);
+}
+
+// Rundor som på aim_map: när någon dör börjar en ny runda efter 3 sekunder
+let score = { p: 0, b: 0 }, roundT = -1;
+function roundOver(playerWon, hs) {
+  if (roundT >= 0) return;
+  roundT = 3;
+  if (playerWon) score.p++; else score.b++;
+  document.getElementById('scP').textContent = score.p;
+  document.getElementById('scB').textContent = score.b;
+  const it = document.createElement('div');
+  it.textContent = playerWon ? `Du ⟶ Bot${hs ? ' (huvudskott)' : ''}` : `Bot ⟶ Du${hs ? ' (huvudskott)' : ''}`;
+  if (hs) it.className = 'hs';
+  feed.appendChild(it);
+  setTimeout(() => { it.style.opacity = 0; setTimeout(() => it.remove(), 600); }, 4000);
+  banner.innerHTML = playerWon ? 'Du vann rundan<small>Ny runda om 3 sekunder</small>' : 'Du dog<small>Ny runda om 3 sekunder</small>';
+  banner.style.display = 'block';
+}
+function resetRound() {
+  roundT = -1; banner.style.display = 'none';
+  P.hp = 100; P.armor = 100; P.dead = false;
+  P.pos.set(SPAWN_P.x + (Math.random() - 0.5) * 6, 0, SPAWN_P.z);
+  P.vel.set(0, 0, 0); P.yaw = SPAWN_P.yaw; P.pitch = 0; P.ground = true; camY = null;
+  WEAPONS.ak.clip = 30; WEAPONS.ak.reserve = 90; WEAPONS.glock.clip = 20; WEAPONS.glock.reserve = 120;
+  WS.punchX = 0; WS.punchY = 0; WS.shots = 0;
+  const cur = WS.cur; WS.cur = ''; switchTo(cur === '' ? 'ak' : cur);
+  resetBot();
+}
+resetBot();
+
+// Siktlinje: når en stråle från a till b utan att träffa lådor eller murar?
+const _lo = new THREE.Vector3(), _ld = new THREE.Vector3();
+function lineOfSight(ax, ay, az, bx, by, bz) {
+  _lo.set(ax, ay, az); _ld.set(bx - ax, by - ay, bz - az);
+  const dist = _ld.length(); _ld.divideScalar(dist);
+  return raycastWorld(_lo, _ld).t >= dist - 0.05;
+}
+function wrapAng(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+function botCollide() {
+  for (const b of boxes) {
+    const x0 = b.minx - BOT_R, x1 = b.maxx + BOT_R, z0 = b.minz - BOT_R, z1 = b.maxz + BOT_R;
+    if (bot.x <= x0 || bot.x >= x1 || bot.z <= z0 || bot.z >= z1) continue;
+    const pl = bot.x - x0, pr = x1 - bot.x, pn = bot.z - z0, pf = z1 - bot.z, m = Math.min(pl, pr, pn, pf);
+    if (m === pl) bot.x = x0; else if (m === pr) bot.x = x1; else if (m === pn) bot.z = z0; else bot.z = z1;
+  }
+  // Knuffas inte in i spelaren
+  const dx = bot.x - P.pos.x, dz = bot.z - P.pos.z, d = Math.hypot(dx, dz), min = BOT_R + BODY;
+  if (d < min && d > 1e-4 && !P.dead) { bot.x = P.pos.x + dx / d * min; bot.z = P.pos.z + dz / d * min; }
+}
+function botShoot() {
+  const L = botLevel();
+  const u = Math.hypot(bot.vx, bot.vz) / CS_U;
+  const acc = bot.shots > 0 ? Math.min(1.25, bot.shots ** 3 / 200 + 0.35) : 0.2;
+  const spread = u > 140 ? 0.04 + 0.07 * acc : 0.0275 * acc;
+  bot.shots++; bot.clip--;
+  // Rekyl på boten; bättre bottar kompenserar en del av den
+  let up = bot.shots === 1 ? 1.0 : 1.0 + bot.shots * 0.175, lat = bot.shots === 1 ? 0.375 : 0.375 + bot.shots * 0.0375;
+  bot.punchX = Math.max(bot.punchX - up, -5.75);
+  bot.punchY = bot.dir === 1 ? Math.min(bot.punchY + lat, 1.75) : Math.max(bot.punchY - lat, -1.75);
+  if (Math.random() < 1 / 9) bot.dir = -bot.dir;
+  const pitch = bot.pitch - bot.punchX * D2R * (1 - L.comp) + bot.errP * D2R;
+  const yaw = bot.yaw + bot.punchY * D2R * (1 - L.comp) + bot.errY * D2R;
+  const o = new THREE.Vector3(bot.x, bot.y + BOT_EYE, bot.z);
+  const d = new THREE.Vector3(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+  // spridning
+  const r = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)), up3 = new THREE.Vector3().crossVectors(r, d);
+  const sx = (Math.random() - 0.5) + (Math.random() - 0.5), sy = (Math.random() - 0.5) + (Math.random() - 0.5);
+  d.addScaledVector(r, sx * spread).addScaledVector(up3, sy * spread).normalize();
+  const w = raycastWorld(o, d);
+  const ph = P.dead ? null : rayFigure(o, d, P.pos.x, P.pos.y, P.pos.z, playerHeight(), 0.3);
+  let endT = w.hit ? w.t : 150;
+  if (ph && ph.t < w.t) {
+    const dmg = 36 * Math.pow(RANGE_MOD.ak, ph.t / (500 * CS_U));
+    hurtPlayer(dmg, 'ak', ph.zone, bot.x, bot.z);
+    endT = ph.t;
+  } else if (w.hit) impact(_p.copy(o).addScaledVector(d, w.t), w.n, w.kind);
+  botG.updateMatrixWorld(true);
+  spawnTracer(botFlash.getWorldPosition(new THREE.Vector3()), o.clone().addScaledVector(d, endT));
+  bot.flash = 0.045; botFlash.material.rotation = Math.random() * 6.28;
+  // Ljud: svagare och åt rätt håll beroende på var boten står
+  const dist = Math.hypot(bot.x - P.pos.x, bot.z - P.pos.z);
+  const rel = wrapAng(Math.atan2(-(bot.x - P.pos.x), -(bot.z - P.pos.z)) - P.yaw);
+  gunSound('ak', Math.max(0.25, 1 - dist / 70), Math.max(-0.9, Math.min(0.9, -Math.sin(rel))));
+}
+function updateBot(dt) {
+  if (S.botOn <= 0) { botG.visible = false; return; }
+  botG.visible = true;
+  const L = botLevel();
+  if (!bot.alive) {
+    bot.deadT += dt;
+    const f = Math.min(1, bot.deadT / 0.45);
+    botG.rotation.set(-f * f * Math.PI / 2 * 0.95, bot.yaw, 0);
+    botG.position.y = bot.y + f * 0.12;
+    botFlash.visible = false;
+    return;
+  }
+  // Ser boten dig?
+  const ex = bot.x, ey = bot.y + BOT_EYE, ez = bot.z;
+  const tx = P.pos.x, tz = P.pos.z, th = playerHeight();
+  const toYaw = Math.atan2(-(tx - ex), -(tz - ez));
+  const inFov = Math.abs(wrapAng(toYaw - bot.yaw)) < 1.4 || bot.alertT > 0;
+  const seesHead = !P.dead && inFov && lineOfSight(ex, ey, ez, tx, P.pos.y + th - 0.12, tz);
+  const seesBody = !P.dead && inFov && lineOfSight(ex, ey, ez, tx, P.pos.y + th * 0.6, tz);
+  const sees = seesHead || seesBody;
+  if (sees) {
+    if (bot.seeT === 0) { // nytt mål: välj var den siktar och hur fel den siktar först
+      bot.errY = (Math.random() - 0.5) * 2 * L.err; bot.errP = (Math.random() - 0.5) * 2 * L.err * 0.7;
+      bot.aimHead = Math.random() < L.head;
+    }
+    bot.seeT += dt; bot.lastSeen = { x: tx, z: tz }; bot.alertT = 2;
+  } else { bot.seeT = 0; bot.alertT = Math.max(0, bot.alertT - dt); }
+  // Felsiktet minskar ju längre den ser dig
+  const settle = Math.min(1, dt * 1.6);
+  bot.errY -= bot.errY * settle; bot.errP -= bot.errP * settle;
+
+  // Vart den tittar
+  let wantYaw = bot.yaw, wantPitch = 0;
+  if (sees) {
+    const aimY = P.pos.y + (bot.aimHead || !seesBody ? th - 0.12 : th * 0.62);
+    wantYaw = toYaw;
+    wantPitch = Math.atan2(aimY - ey, Math.hypot(tx - ex, tz - ez));
+  } else if (bot.lastSeen) wantYaw = Math.atan2(-(bot.lastSeen.x - ex), -(bot.lastSeen.z - ez));
+  else if (bot.target) wantYaw = Math.atan2(-(bot.target.x - ex), -(bot.target.z - ez));
+  const maxTurn = L.turn * D2R * dt;
+  const dy = wrapAng(wantYaw - bot.yaw);
+  bot.yaw += Math.max(-maxTurn, Math.min(maxTurn, dy));
+  bot.pitch += Math.max(-maxTurn, Math.min(maxTurn, wantPitch - bot.pitch));
+
+  // Skjuta: efter reaktionstiden, när den siktar ungefär rätt, i korta salvor
+  bot.next -= dt; bot.pauseT -= dt; bot.flash -= dt;
+  if (bot.reloadT > 0) { bot.reloadT -= dt; if (bot.reloadT <= 0) bot.clip = 30; }
+  else if (bot.clip <= 0) { bot.reloadT = 2.45; bot.shots = 0; }
+  const aimed = Math.abs(dy) < 6 * D2R;
+  if (sees && bot.seeT > L.react && aimed && bot.reloadT <= 0 && roundT < 0) {
+    if (bot.burstLeft <= 0 && bot.pauseT <= 0) bot.burstLeft = L.burst[0] + Math.floor(Math.random() * (L.burst[1] - L.burst[0] + 1));
+    if (bot.burstLeft > 0 && bot.next <= 0) {
+      botShoot(); bot.next = 0.0955; bot.burstLeft--;
+      if (bot.burstLeft <= 0) bot.pauseT = L.pause[0] + Math.random() * (L.pause[1] - L.pause[0]);
+    }
+  }
+  if (!(sees && bot.burstLeft > 0)) { // vila mellan salvor: siktet återhämtar sig
+    const len = Math.hypot(bot.punchX, bot.punchY);
+    if (len > 0) { const nl = Math.max(0, len - (10 + len * 0.5) * dt); bot.punchX *= nl / len; bot.punchY *= nl / len; }
+    if (bot.pauseT < -0.4) bot.shots = Math.max(0, bot.shots - Math.floor(dt / 0.0225 + 1));
+  }
+
+  // Röra sig: stå still när den skjuter, strafea mellan salvorna, annars leta eller patrullera
+  const maxSp = 230 * CS_U * (S.csSpeed / 250);
+  let wx = 0, wz = 0, sp = maxSp;
+  if (sees) {
+    if (bot.burstLeft > 0 && bot.next > -0.2) sp = 0;
+    else {
+      bot.strafeT -= dt;
+      if (bot.strafeT <= 0) { bot.strafe = Math.random() < 0.5 ? -1 : 1; bot.strafeT = 0.4 + Math.random() * 0.6; }
+      wx = Math.cos(bot.yaw) * bot.strafe; wz = -Math.sin(bot.yaw) * bot.strafe;
+    }
+  } else {
+    let goal = bot.lastSeen || bot.target;
+    if (!goal) goal = bot.target = freePoint();
+    const gx = goal.x - bot.x, gz = goal.z - bot.z, gd = Math.hypot(gx, gz);
+    if (gd < 0.8) { if (bot.lastSeen) bot.lastSeen = null; else bot.target = freePoint(); }
+    else { wx = gx / gd; wz = gz / gd; }
+    // Fastnat? Välj ett nytt mål
+    if (gd > bot.lastDist - 0.02) bot.stuckT += dt; else bot.stuckT = 0;
+    bot.lastDist = gd;
+    if (bot.stuckT > 1) { bot.target = freePoint(); bot.lastSeen = null; bot.stuckT = 0; bot.lastDist = 1e9; }
+    if (!bot.lastSeen) sp *= 0.6; // lugnare när den patrullerar
+  }
+  const k = Math.min(1, dt * 8);
+  bot.vx += (wx * sp - bot.vx) * k; bot.vz += (wz * sp - bot.vz) * k;
+  bot.x += bot.vx * dt; bot.z += bot.vz * dt;
+  bot.x = Math.max(-ARENA_W / 2 + BOT_R, Math.min(ARENA_W / 2 - BOT_R, bot.x));
+  bot.z = Math.max(-ARENA_L / 2 + BOT_R, Math.min(ARENA_L / 2 - BOT_R, bot.z));
+  botCollide();
+
+  // Animation: benen går, armarna och vapnet följer siktet
+  const hsp = Math.hypot(bot.vx, bot.vz);
+  bot.walk += hsp * dt * 3.2;
+  const sw = Math.sin(bot.walk) * Math.min(1, hsp / 2) * 0.55;
+  legL.rotation.x = sw; legR.rotation.x = -sw;
+  botG.position.set(bot.x, bot.y + Math.abs(Math.cos(bot.walk)) * 0.03 * Math.min(1, hsp / 2), bot.z);
+  botG.rotation.set(0, bot.yaw, 0);
+  armsG.rotation.x = bot.pitch - bot.punchX * D2R * 0.5;
+  headG.rotation.x = bot.pitch * 0.6;
+  botFlash.visible = bot.flash > 0;
+}
+// ---------- Hitmarker ----------
+// Ett kryss runt hårkorset när du träffar: vitt för träff, gult för huvudskott, rött och större när du dödar.
+const hm = document.createElement('div'); hm.id = 'hitm';
+hm.innerHTML = '<i></i><i></i><i></i><i></i>';
+document.body.appendChild(hm);
+const hmCss = document.createElement('style');
+hmCss.textContent = `
+#hitm{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;opacity:0;--c:#fff;--s:1}
+#hitm i{position:absolute;width:2px;height:9px;background:var(--c);box-shadow:0 0 2px rgba(0,0,0,.9);left:-1px;top:-4.5px}
+#hitm i:nth-child(1){transform:rotate(45deg) translateY(calc(-11px * var(--s)))}
+#hitm i:nth-child(2){transform:rotate(135deg) translateY(calc(-11px * var(--s)))}
+#hitm i:nth-child(3){transform:rotate(225deg) translateY(calc(-11px * var(--s)))}
+#hitm i:nth-child(4){transform:rotate(315deg) translateY(calc(-11px * var(--s)))}`;
+document.head.appendChild(hmCss);
+let hmT = 0, hmDur = 0.25;
+function hitMarker(kind) { // 'hit', 'head' eller 'kill'
+  if (!S.hitmark) return;
+  const c = kind === 'kill' ? '#ff3b30' : kind === 'head' ? '#ffd23a' : '#ffffff';
+  hm.style.setProperty('--c', c);
+  hm.style.setProperty('--s', kind === 'kill' ? 1.45 : kind === 'head' ? 1.15 : 1);
+  hmDur = kind === 'kill' ? 0.6 : 0.25; hmT = hmDur;
+  if (S.hitSound > 0 && actx && actx.state === 'running') {
+    try { // ett kort "tick", högre ton för huvudskott och dödande
+      const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'triangle'; o.frequency.value = kind === 'kill' ? 1250 : kind === 'head' ? 1600 : 2200;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18 * S.hitSound, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + (kind === 'kill' ? 0.2 : 0.07));
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.25);
+      if (kind === 'kill') {
+        const o2 = actx.createOscillator(), g2 = actx.createGain();
+        o2.type = 'triangle'; o2.frequency.value = 1700;
+        g2.gain.setValueAtTime(0.0001, t + 0.08); g2.gain.exponentialRampToValueAtTime(0.15 * S.hitSound, t + 0.085);
+        g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+        o2.connect(g2); g2.connect(actx.destination); o2.start(t + 0.08); o2.stop(t + 0.3);
+      }
+    } catch (e) {}
+  }
+}
+function updateHitMarker(dt) {
+  hmT = Math.max(0, hmT - dt);
+  hm.style.opacity = playing ? Math.min(1, hmT / hmDur * 1.6) : 0;
+}
+
+// Spelaren träffar boten
+function hitBot(o, d, maxT, kind) {
+  if (!bot.alive || S.botOn <= 0) return null;
+  const h = rayFigure(o, d, bot.x, bot.y, bot.z, BOT_H, BOT_R);
+  if (!h || h.t >= maxT) return null;
+  return h;
+}
+function damageBot(dmg, kind, zone, point) {
+  applyDamage(bot, dmg, kind, zone);
+  bot.alertT = 2; bot.lastSeen = { x: P.pos.x, z: P.pos.z };
+  bot.errY *= 1.3; bot.errP *= 1.3; // den blir lite skakig av att bli träffad
+  // Blod
+  for (let i = 0; i < 5; i++) {
+    const dd = dust[dustI++ % dust.length];
+    dd.m.position.copy(point);
+    dd.v.set((Math.random() - 0.5) * 2, Math.random() * 1.5, (Math.random() - 0.5) * 2);
+    dd.m.material.color.setHex(0x8a0d0d); dd.m.material.opacity = 1; dd.life = 0.4; dd.m.visible = true;
+  }
+  clickSound(zone === 'head' ? 1900 : 380, zone === 'head' ? 0.45 : 0.4, zone === 'head' ? 0.08 : 0.1);
+  if (bot.hp <= 0 && bot.alive) {
+    bot.alive = false; bot.deadT = 0; bot.hp = 0;
+    hitMarker('kill');
+    roundOver(true, zone === 'head');
+  } else hitMarker(zone === 'head' ? 'head' : 'hit');
+}
+// Kniven
+function swishSound(vol = 0.4, delay = 0) {
+  if (!actx || actx.state !== 'running' || S.gunVol <= 0) return;
+  ensureGunAudio();
+  try {
+    const t = actx.currentTime + delay;
+    const src = actx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.5;
+    bp.frequency.setValueAtTime(900, t); bp.frequency.exponentialRampToValueAtTime(3200, t + 0.15);
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * S.gunVol, t + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    src.connect(bp); bp.connect(g); g.connect(gunBus); src.start(t); src.stop(t + 0.25);
+  } catch (e) {}
+}
+function knifeAttack(stab) {
+  WS.state = stab ? 'stab' : 'slash'; WS.t = 0;
+  if (!stab) WS.slashSide = -WS.slashSide;
+  const range = (stab ? 32 : 48) * CS_U + 0.35; // 1.6: hugg når 48 enheter, stick 32
+  const hitDelay = stab ? 0.22 : 0.1;
+  swishSound(stab ? 0.45 : 0.35, stab ? 0.12 : 0);
+  setTimeout(() => {
+    if (!playing || P.dead) return;
+    camera.updateMatrixWorld();
+    const e = camera.matrixWorld.elements;
+    const o = new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld);
+    const d = new THREE.Vector3(-e[8], -e[9], -e[10]).normalize();
+    // Boten: träff om den är nära och ungefär framför dig
+    if (bot.alive && S.botOn > 0) {
+      const bx = bot.x - o.x, bz = bot.z - o.z, bd = Math.hypot(bx, bz);
+      const ang = Math.acos(Math.max(-1, Math.min(1, (bx * d.x + bz * d.z) / (bd * Math.hypot(d.x, d.z) + 1e-6))));
+      if (bd < range + BOT_R && ang < 0.45 && lineOfSight(o.x, o.y, o.z, bot.x, bot.y + 1.2, bot.z)) {
+        // Ryggstick: bakifrån gör tre gånger så mycket skada
+        const fx = -Math.sin(bot.yaw), fz = -Math.cos(bot.yaw);
+        const behind = (fx * -bx + fz * -bz) / (bd + 1e-6) < -0.5; // du står bakom boten
+        const dmg = (stab ? 65 : 15) * (behind ? 3 : 1);
+        damageBot(dmg, 'knife', 'chest', new THREE.Vector3(bot.x, bot.y + 1.2, bot.z));
+        return;
+      }
+    }
+    const w = raycastWorld(o, d);
+    if (w.hit && w.t < range) { clickSound(3200, 0.4, 0.06); clickSound(1400, 0.25, 0.08); }
+  }, hitDelay * 1000);
+  WS.next = WS.time + (stab ? 1.1 : 0.4);
+}
+
+// ---------- Kvalitet ----------
+const fpsEl = document.getElementById('fps');
+let shadowSize = 0;
+function applyQuality() {
+  if (!qualityDirty) return;
+  qualityDirty = false;
+  const pr = Math.min(devicePixelRatio || 1, 2) * S.scale;
+  renderer.setPixelRatio(pr);
+  renderer.setSize(innerWidth, innerHeight);
+  rt.setSize(Math.round(innerWidth * pr), Math.round(innerHeight * pr));
+  sun.castShadow = S.shadows > 0;
+  const size = S.shadows >= 2 ? 2048 : 1024;
+  if (size !== shadowSize) {
+    shadowSize = size; sun.shadow.mapSize.set(size, size);
+    if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+  }
+  sc.left = -S.shadowDist; sc.right = S.shadowDist; sc.top = S.shadowDist; sc.bottom = -S.shadowDist;
+  sc.updateProjectionMatrix();
+  fpsEl.style.display = S.fps ? 'block' : 'none';
+}
+let fpsT = 0, fpsN = 0;
+function countFps(dt) {
+  if (!S.fps) return;
+  fpsT += dt; fpsN++;
+  if (fpsT >= 0.5) { fpsEl.textContent = Math.round(fpsN / fpsT) + ' FPS'; fpsT = 0; fpsN = 0; }
+}
+
+// Världen först, sedan vapnet ovanpå (så att det aldrig går in i murar)
+function renderWorld(target) {
+  renderer.setRenderTarget(target);
+  renderer.render(scene, camera);
+  if (playing) {
+    renderer.autoClear = false;
+    renderer.clearDepth();
+    renderer.render(vmScene, vmCam);
+    renderer.autoClear = true;
+  }
+}
+
+// ---------- Loop ----------
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  vmCam.aspect = camera.aspect; vmCam.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  qualityDirty = true;
+});
+
+camera.position.set(P.pos.x, P.pos.y + S.eye, P.pos.z);
+camera.rotation.set(P.pitch, P.yaw, 0);
+const sunN = SUNDIR.clone().normalize();
+const clock = new THREE.Clock();
+function frame() {
+  const raw = clock.getDelta(), dt = Math.min(raw, 0.05);
+  countFps(raw);
+  if (playing && !P.dead) update(dt);
+  else if (playing && P.dead) { // död: kameran faller till marken
+    P.deadT += dt;
+    const f = Math.min(1, P.deadT / 0.6);
+    camera.position.set(P.pos.x, P.pos.y + S.eye - f * f * (S.eye - 0.3), P.pos.z);
+    camera.rotation.set(P.pitch * (1 - f), P.yaw, f * 0.9);
+  }
+  else { P.yaw += dt * 0.04; camera.rotation.set(P.pitch, P.yaw, 0); }
+  if (playing) {
+    updateBot(dt);
+    if (roundT >= 0) { roundT -= dt; if (roundT <= 0) resetRound(); }
+  }
+  updateWeapons(dt);
+  updatePlayerHud(dt);
+  updateHitMarker(dt);
+  applyQuality();
+  updateWorld();
+  drawCompass();
+  sky.position.copy(camera.position);
+  sunDisc.position.copy(camera.position).addScaledVector(sunN, 320);
+  // Skuggornas mitt flyttas i små fasta steg så att kanterna inte fladdrar när du går
+  const texel = (2 * S.shadowDist) / (shadowSize || 2048);
+  const sx0 = Math.round(P.pos.x / texel) * texel, sz0 = Math.round(P.pos.z / texel) * texel;
+  sun.target.position.set(sx0, P.pos.y, sz0);
+  sun.position.set(sx0 + SUNDIR.x, P.pos.y + SUNDIR.y, sz0 + SUNDIR.z);
+
+  // Hur långt bilden flyttade sig på skärmen sedan förra bilden
+  const vf = camera.fov * Math.PI / 180;
+  const hf = 2 * Math.atan(Math.tan(vf / 2) * camera.aspect);
+  const blurK = S.mode === 1 ? 0 : S.blur; // CS-läget: ren bild utan effekter
+  const tx = playing ? (P.yaw - prevYaw) / hf * blurK : 0;
+  const ty = playing ? (P.pitch - prevPitch) / vf * blurK : 0;
+  prevYaw = P.yaw; prevPitch = P.pitch;
+  blurDir.x += (tx - blurDir.x) * 0.5;
+  blurDir.y += (ty - blurDir.y) * 0.5;
+  if (blurDir.length() > 0.12) blurDir.setLength(0.12);
+
+  // Kantsuddighet växer med farten när du springer
+  const runT = S.runSpeed > S.speed ? (P.hs - S.speed) / (S.runSpeed - S.speed) : 0;
+  const edgeTarget = playing && S.mode !== 1 ? Math.max(0, Math.min(1, runT)) * S.edgeBlur : 0;
+  edgeAmt += (edgeTarget - edgeAmt) * Math.min(1, dt * 4);
+
+  if (blurDir.length() > 0.0015 || edgeAmt > 0.01) {
+    blurMat.uniforms.dir.value.copy(blurDir);
+    blurMat.uniforms.edge.value = edgeAmt;
+    blurMat.uniforms.aspect.value = camera.aspect;
+    renderWorld(rt);
+    renderer.setRenderTarget(null);
+    renderer.render(postScene, postCam);
+  } else {
+    renderWorld(null);
+  }
+  requestAnimationFrame(frame);
+}
+frame();
+}
+</script>
+</body>
+</html>

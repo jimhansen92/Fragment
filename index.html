@@ -29,6 +29,9 @@ details.set summary{cursor:pointer;font-weight:700;font-size:17px;padding:8px 0;
 .prof{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 4px}
 .prof select{flex:1 1 160px;min-height:40px;font:inherit;font-size:15px;padding:6px 8px;border-radius:8px;background:#2a2418;color:#f3efe2;border:1px solid rgba(243,239,226,.35)}
 .prof .reset{margin-top:0}
+.xhprev{height:90px;border-radius:8px;margin:6px 0;background:linear-gradient(135deg,#7d8a6a,#c9b48a 50%,#3d4a3a);position:relative;overflow:hidden}
+.xhprev div{position:absolute;left:50%;top:50%;width:0;height:0}
+.xhprev i{position:absolute}
 button{font:inherit;font-size:18px;font-weight:700;padding:12px 28px;border:0;border-radius:10px;background:#e8a33a;color:#1b1408;cursor:pointer;min-height:44px}
 button:hover{background:#f2b453}
 button:focus-visible{outline:3px solid #fff;outline-offset:2px}
@@ -82,6 +85,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:2px}
 <div id="hint"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 {
 // ---------- Grund ----------
@@ -747,6 +751,28 @@ function update(dt) {
 }
 
 // ---------- Inställningar ----------
+// Hårkorsets färger (namn, CSS-färg)
+let xhStyled = false; // false = spelets hårkors behöver ritas om efter ändrade inställningar
+const XH_COLORS = [['Grön', '#4cff4c'], ['Gul', '#ffe14c'], ['Röd', '#ff3b3b'], ['Blå', '#4c8cff'], ['Cyan', '#4cffff'], ['Rosa', '#ff6be6'], ['Vit', '#ffffff']];
+// Ritar ett hårkors (4 streck + prick) efter inställningarna; används både i spelet och i förhandsvisningen
+function styleXh(parts) {
+  const col = XH_COLORS[S.xhColor][1], T = S.xhThick, L = S.xhSize;
+  const shadow = S.xhOutline ? '0 0 0 1px #000' : '0 0 1px rgba(0,0,0,.8)';
+  parts.forEach((p, i) => {
+    p.style.background = col; p.style.boxShadow = shadow; p.style.opacity = S.xhAlpha;
+    if (i < 2) { p.style.width = T + 'px'; p.style.height = L + 'px'; p.style.left = (-T / 2) + 'px'; }
+    else if (i < 4) { p.style.height = T + 'px'; p.style.width = L + 'px'; p.style.top = (-T / 2) + 'px'; }
+    else { p.style.width = p.style.height = T + 'px'; p.style.left = p.style.top = (-T / 2) + 'px'; }
+  });
+  parts[0].style.display = L && !S.xhT ? '' : 'none';
+  parts[1].style.display = parts[2].style.display = parts[3].style.display = L ? '' : 'none';
+  parts[4].style.display = S.xhDot ? '' : 'none';
+}
+function placeXh(parts, g) {
+  const L = S.xhSize;
+  parts[0].style.top = (-g - L) + 'px'; parts[1].style.top = g + 'px';
+  parts[2].style.left = (-g - L) + 'px'; parts[3].style.left = g + 'px';
+}
 const DEFS = [
   { g: 'Kamera' },
   { id: 'fov', label: 'Synfält (FOV)', min: 50, max: 110, step: 1, def: 72, f: v => v + '°' },
@@ -764,12 +790,22 @@ const DEFS = [
   { g: 'Rörelse' },
   { id: 'mode', label: 'Rörelsestil', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'CS' : 'Realistisk' },
   { g: 'Hårkors' },
+  { id: 'xhStyle', label: 'Typ (dynamiskt växer när du rör dig och skjuter)', min: 0, max: 1, step: 1, def: 0, f: v => v ? 'Statiskt' : 'Dynamiskt' },
+  { id: 'xhColor', label: 'Färg', min: 0, max: XH_COLORS.length - 1, step: 1, def: 0, f: v => XH_COLORS[v][0] },
+  { id: 'xhAlpha', label: 'Synlighet', min: 0.2, max: 1, step: 0.05, def: 1, f: v => Math.round(v * 100) + ' %' },
+  { id: 'xhSize', label: 'Längd på strecken', min: 0, max: 20, step: 1, def: 8, f: v => v ? v + ' px' : 'Inga streck' },
+  { id: 'xhThick', label: 'Tjocklek', min: 1, max: 6, step: 0.5, def: 2, f: v => v + ' px' },
+  { id: 'xhGap', label: 'Mellanrum i mitten', min: -3, max: 12, step: 1, def: 4, f: v => v + ' px' },
+  { id: 'xhOutline', label: 'Svart kant', min: 0, max: 1, step: 1, def: 0, f: v => v ? 'På' : 'Av' },
+  { id: 'xhDot', label: 'Prick i mitten', min: 0, max: 1, step: 1, def: 0, f: v => v ? 'På' : 'Av' },
+  { id: 'xhT', label: 'T-form (inget streck uppåt)', min: 0, max: 1, step: 1, def: 0, f: v => v ? 'På' : 'Av' },
   { id: 'xhSpeed', label: 'Hur snabbt hårkorset drar ihop sig', min: 0.5, max: 4, step: 0.1, def: 2, f: v => v.toFixed(1) + '×' },
   { g: 'Hitmarker' },
   { id: 'hitmark', label: 'Hitmarker', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
   { id: 'hitSound', label: 'Träffljud', min: 0, max: 1.5, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
   { g: 'Bot' },
   { id: 'botOn', label: 'Bot', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
+  { id: 'headSize', label: 'Botens huvudstorlek (svårare huvudskott)', min: 0.6, max: 1.2, step: 0.05, def: 0.8, f: v => Math.round(v * 100) + ' %' },
   { id: 'botLevel', label: 'Svårighet', min: 0, max: 2, step: 1, def: 1, f: v => ['Lätt', 'Normal', 'Svår'][v] },
   { g: 'Vapen' },
   { id: 'gunVol', label: 'Skottvolym', min: 0, max: 1.5, step: 0.05, def: 0.8, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
@@ -777,7 +813,9 @@ const DEFS = [
   { id: 'duckAcc', label: 'Spridning när du hukar', min: 0.3, max: 1, step: 0.05, def: 0.6, f: v => Math.round(v * 100) + ' % av stående' },
   { id: 'wallbang', label: 'Skjuta igenom lådor (wallbang)', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
   { id: 'recoil', label: 'Rekylstyrka (100 % = som 1.6)', min: 0, max: 1.2, step: 0.05, def: 0.65, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
-  { id: 'spreadK', label: 'Spridning (100 % = som 1.6)', min: 0, max: 1.2, step: 0.05, def: 0.7, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
+  { id: 'firstShot', label: 'Duttade skott går mitt i siktet (när du står still)', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
+  { id: 'tapTime', label: 'Paus som krävs mellan duttar', min: 0.1, max: 1, step: 0.05, def: 0.3, f: v => v.toFixed(2) + ' s' },
+  { id: 'spreadK', label: 'Spridning (100 % = som 1.6)', min: 0, max: 3, step: 0.05, def: 0.7, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
   { id: 'vmKick', label: 'Vapnets rörelse när du skjuter', min: 0, max: 1.5, step: 0.05, def: 0.7, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
   { id: 'vmScale', label: 'Vapnets storlek i bild', min: 0.4, max: 1, step: 0.01, def: 0.68, f: v => Math.round(v * 100) + ' %' },
   { id: 'vmBob', label: 'Vapnet gungar när du går', min: 0, max: 2, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
@@ -837,6 +875,11 @@ setEl.innerHTML = DEFS.map(d => d.g
   ? `<div class="grp">${d.g}</div>`
   : `<div class="row"><label for="s-${d.id}">${d.label}</label><output id="o-${d.id}"></output>
      <input type="range" id="s-${d.id}" min="${d.min}" max="${d.max}" step="${d.step}"></div>`).join('');
+// Förhandsvisning av hårkorset, direkt under rubriken "Hårkors"
+const xhPrev = document.createElement('div'); xhPrev.className = 'xhprev';
+xhPrev.innerHTML = '<div><i></i><i></i><i></i><i></i><i></i></div>';
+[...setEl.querySelectorAll('.grp')].find(e => e.textContent === 'Hårkors').after(xhPrev);
+const xhPrevParts = [...xhPrev.firstChild.children];
 
 function applySettings() {
   camera.fov = S.fov; camera.updateProjectionMatrix();
@@ -845,6 +888,8 @@ function applySettings() {
     document.getElementById('s-' + d.id).value = S[d.id];
     document.getElementById('o-' + d.id).textContent = d.f(S[d.id]);
   });
+  styleXh(xhPrevParts); placeXh(xhPrevParts, S.xhGap);
+  xhStyled = false; // spelets hårkors ritas om nästa bildruta
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => { try { localStorage.setItem('skogen-settings', JSON.stringify(S)); } catch (e) {} }, 300);
 }
@@ -873,7 +918,7 @@ const BUILTIN_PROFILES = {
   'Min profil': {
     fov: 72, sens: 1, blur: 0.6, edgeBlur: 1, shake: 1, turnTilt: 1, airMouse: 0.3, airShake: 1, jumpVar: 1,
     sway: 1, breath: 1, eye: 1.7, mode: 1, xhSpeed: 2, hitmark: 1, hitSound: 1, botOn: 1, botLevel: 1,
-    gunVol: 0.8, tracers: 1, duckAcc: 0.6, wallbang: 1, recoil: 0.6, spreadK: 1.2, vmKick: 0.6, vmScale: 0.68,
+    gunVol: 0.8, tracers: 1, duckAcc: 0.6, wallbang: 1, recoil: 0.6, firstShot: 1, tapTime: 0.3, spreadK: 1.6, vmKick: 0.6, vmScale: 0.68,
     vmBob: 1, vmFlash: 1, csPreset: 0, csSens: 2, wheelJump: 1, csSpeed: 280, csAccel: 5, csAirAccel: 20,
     csFriction: 4, csStop: 75, csJump: 40, csBhop: 2.25, csJumpWin: 0.005, csHopLoss: 0.12
   }
@@ -1129,7 +1174,7 @@ hud.id = 'hud';
 hud.innerHTML = '<div id="wname"></div><div id="ammo"><b id="aclip">30</b><span>|</span><i id="ares">90</i></div><div id="wmode"></div>';
 document.body.appendChild(hud);
 const xh = document.createElement('div'); xh.id = 'xhair';
-xh.innerHTML = '<i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i>';
+xh.innerHTML = '<i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="d"></i>';
 document.body.appendChild(xh);
 const hudCss = document.createElement('style');
 hudCss.textContent = `
@@ -1139,9 +1184,7 @@ hudCss.textContent = `
 #hud #wname,#hud #wmode{opacity:.8;font-size:14px}
 #hud.low #aclip{color:#ff4b3a}
 #xhair{position:fixed;left:50%;top:50%;width:0;height:0;pointer-events:none;display:none}
-#xhair i{position:absolute;background:#4cff4c;box-shadow:0 0 1px rgba(0,0,0,.8)}
-#xhair .t,#xhair .b{width:2px;height:8px;left:-1px}
-#xhair .l,#xhair .r{height:2px;width:8px;top:-1px}`;
+#xhair i{position:absolute}`;
 document.head.appendChild(hudCss);
 const xParts = [...xh.children];
 const elClip = document.getElementById('aclip'), elRes = document.getElementById('ares'),
@@ -1168,9 +1211,9 @@ function updateHud(dt) {
   if (moveState().duck) tgt -= 2;
   const rate = tgt > xGap ? 30 : 14 * S.xhSpeed; // vidgas snabbt, drar ihop sig i vald takt
   xGap += (tgt - xGap) * Math.min(1, dt * rate);
-  const g = xGap, L = 8;
-  xParts[0].style.top = (-g - L) + 'px'; xParts[1].style.top = g + 'px';
-  xParts[2].style.left = (-g - L) + 'px'; xParts[3].style.left = g + 'px';
+  if (!xhStyled) { styleXh(xParts); xhStyled = true; }
+  // Dynamiskt: grundmellanrummet plus det som rörelse och skott lägger till; statiskt: bara grundmellanrummet
+  placeXh(xParts, S.xhStyle ? S.xhGap : S.xhGap + xGap - 4);
 }
 const crouchHeld = () => !!(keys.ControlLeft || keys.ControlRight || keys.KeyC);
 
@@ -1422,11 +1465,21 @@ function moveState() {
   const duck = P.ground && (S.mode === 1 ? csDuckT > 0.6 : crouchHeld());
   return { air: !P.ground, moving: u > 140, anyMove: u > 0.5, duck };
 }
+// Duttning: ett nytt tryck på avtryckaren, minst S.tapTime efter förra skottet, går exakt mitt i siktet
+// om du står still eller hukar. Håller du inne (spray) sprids skotten som vanligt.
+function firstShotExact(m) {
+  const tap = WS.newPress && WS.time - (WS.lastShotT ?? -99) >= S.tapTime;
+  WS.newPress = false; WS.lastShotT = WS.time;
+  if (!S.firstShot || !tap || m.air || m.moving) return false;
+  WS.shots = 0; // duttat skott räknas som första skottet: liten rekyl, och nästa skott börjar om
+  return true;
+}
 function shootAK() {
   const w = WEAPONS.ak, m = moveState();
   const acc = WS.shots > 0 ? Math.min(1.25, WS.shots ** 3 / 200 + 0.35) : 0.2;
   let spread = (m.air ? 0.04 + 0.4 * acc : m.moving ? 0.04 + 0.07 * acc : 0.0275 * acc) * S.spreadK;
   if (m.duck && !m.moving) spread *= S.duckAcc; // hukad: skotten samlas tätare i mitten
+  if (firstShotExact(m)) spread = 0;
   WS.shots++; WS.delayFire = true;
   w.clip--;
   fireBullet(spread, 'ak');
@@ -1446,6 +1499,7 @@ function shootGlock() {
   if (WS.burst) spread = m.air ? 1.2 * inacc : m.moving ? 0.185 * inacc : m.duck ? 0.095 * inacc : 0.3 * inacc;
   spread *= S.spreadK;
   if (m.duck && !m.moving) spread *= Math.min(1, S.duckAcc + 0.2); // Glocken är redan bättre hukad i 1.6
+  if (!WS.burst && firstShotExact(m)) spread = 0;
   WS.glockLast = WS.time; WS.shots++;
   w.clip--;
   fireBullet(spread, 'glock');
@@ -1492,7 +1546,7 @@ addEventListener('keydown', e => {
 });
 document.addEventListener('mousedown', e => {
   if (!playing || dragMode) return;
-  if (e.button === 0) { WS.fireHeld = true; WS.firePressed = true; }
+  if (e.button === 0) { WS.fireHeld = true; WS.firePressed = true; WS.newPress = true; }
   if (e.button === 2) {
     if (WS.cur === 'glock') { WS.burst = !WS.burst; clickSound(2400, 0.25, 0.04); }
     else WS.altPressed = true;
@@ -1801,6 +1855,181 @@ bpart(botGun, 0.03, 0.14, 0.06, bGun, 0, -0.1, -0.05);
 const botFlash = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
 botFlash.scale.set(0.35, 0.35, 1); botFlash.position.set(0, 0.015, -0.6); botFlash.visible = false; botGun.add(botFlash);
 
+// Träffytor = exakt botens synliga delar (samma block som ritas, med benens och huvudets rörelser).
+// Huvudskott bara på huvudet (ansikte, mössa, ögonband). Vapnet går att skjuta förbi/igenom.
+const botHitMeshes = [], botJacket = torso.children[0];
+botG.traverse(m => {
+  if (!m.isMesh) return;
+  let zone = null;
+  for (let p = m.parent; p; p = p.parent) {
+    if (p === botGun) return;
+    if (p === headG) { zone = 'head'; break; }
+    if (p === legL || p === legR) { zone = 'legs'; break; }
+    if (p === armsG) { zone = 'chest'; break; }
+  }
+  m.userData.zone = zone || (m === botJacket ? 'body' : 'stomach'); // bältet räknas som mage
+  botHitMeshes.push(m);
+});
+const botRay = new THREE.Raycaster(), _hp = new THREE.Vector3();
+function rayBotModel(o, d, maxT) {
+  headG.scale.setScalar(S.headSize);
+  if (botModel) botModel.head.scale.setScalar(S.headSize);
+  botG.updateMatrixWorld(true);
+  botRay.set(o, d); botRay.far = maxT;
+  if (botModel) { // soldatmodellen: zonen avgörs av vilket ben (skelettdel) träffpunkten sitter på
+    const hit = raySkinned(o, d, maxT);
+    return hit ? { t: hit.t, zone: modelZone(hit.mesh, hit.v) } : null;
+  }
+  const hit = botRay.intersectObjects(botHitMeshes, false)[0];
+  if (!hit) return null;
+  let zone = hit.object.userData.zone;
+  if (zone === 'body') { // jackan: övre 55 % är bröst, resten mage
+    const y = hit.object.worldToLocal(_hp.copy(hit.point)).y; // -0.28 … 0.28
+    zone = y > -0.03 ? 'chest' : 'stomach';
+  }
+  return { t: hit.distance, zone };
+}
+
+// ---------- Botens soldatmodell (Model/terror1.glb) ----------
+// "PC Computer - Half-Life - HECU Grunt HD" av 8-Bit Play (sketchfab.com/8-bit_play), CC-BY-4.0.
+// Modellen har skelett och animationer. Tills den har laddats (eller om den inte går att ladda) används
+// blockfiguren ovan. Träffytorna är modellens egna trianglar i den pose animationen just visar.
+let botModel = null;
+const BOT_MODEL_H = 1.95; // modellens höjd i meter rakt upp och ner; i siktesställningen blir huvudet ca 1,75 m
+const HIDE_MATS = ['DC_soldier_head_mask.BMP', 'DC_soldier_face_cmdr_wht.BMP', 'DC_soldier_face_cmdr_blk.BMP', 'W_SPAS12_REFERENCE.BMP'];
+function boneZone(name) {
+  if (/Head|Bone05/.test(name)) return 'head';
+  if (/Thigh|Calf|Foot|Toe/.test(name)) return 'legs';
+  if (/Pelvis|Spine_0|Spine1|Bip01_00|rootJoint/.test(name)) return 'stomach';
+  return 'chest'; // övre ryggen, nacken och armarna
+}
+function modelZone(mesh, v) {
+  const g = mesh.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+  const W = [sw.getX(v), sw.getY(v), sw.getZ(v), sw.getW(v)], I = [si.getX(v), si.getY(v), si.getZ(v), si.getW(v)];
+  let k = 0; for (let j = 1; j < 4; j++) if (W[j] > W[k]) k = j; // benet som styr hörnet mest
+  const best = I[k];
+  return boneZone(mesh.skeleton.bones[best].name);
+}
+// three.js r128 träfftestar animerade (skinnade) modeller i viloläget, så vi räknar ut var varje hörn
+// sitter i den aktuella posen (en gång per bildruta) och testar strålen mot de trianglarna själva.
+const _sray = new THREE.Ray(), _sa = new THREE.Vector3(), _sb = new THREE.Vector3(), _sc = new THREE.Vector3(), _sp = new THREE.Vector3();
+function raySkinned(o, d, maxT) {
+  _sray.set(o, d);
+  // snabb koll: går strålen ens nära boten?
+  _sa.copy(botG.position); _sa.y += 0.9;
+  if (_sray.distanceSqToPoint(_sa) > 1.6 * 1.6) return null;
+  let best = null;
+  for (const m of botModel.meshes) {
+    const pos = m.geometry.attributes.position, n = pos.count;
+    let wp = m.userData.wp;
+    if (m.userData.pose !== botModel.pose) {
+      if (!wp) wp = m.userData.wp = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { _sa.fromBufferAttribute(pos, i); m.boneTransform(i, _sa); _sa.applyMatrix4(m.matrixWorld).toArray(wp, i * 3); }
+      m.userData.pose = botModel.pose;
+    }
+    const idx = m.geometry.index, tris = (idx ? idx.count : n) / 3;
+    for (let t = 0; t < tris; t++) {
+      const a = idx ? idx.getX(t * 3) : t * 3, b = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, c = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+      _sa.fromArray(wp, a * 3); _sb.fromArray(wp, b * 3); _sc.fromArray(wp, c * 3);
+      if (!_sray.intersectTriangle(_sa, _sb, _sc, false, _sp)) continue;
+      const dist = _sp.distanceTo(o);
+      if (dist < maxT && (!best || dist < best.t)) best = { t: dist, mesh: m, v: a };
+    }
+  }
+  return best;
+}
+if (THREE.GLTFLoader) {
+  new THREE.GLTFLoader().load('Model/terror1.glb', setupBotModel, undefined,
+    e => console.warn('Kunde inte ladda botens modell, använder blockfiguren', e));
+}
+function setupBotModel(gltf) {
+  const root = gltf.scene, meshes = [];
+  let gunMesh = null;
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    const name = o.material.name;
+    o.geometry.computeBoundingBox();
+    // Modellen har flera huvuden och vapen att välja mellan: behåll huvan med glasögon och M4:an
+    if (HIDE_MATS.includes(name) || (name === 'DC_soldier_misc.BMP' && o.geometry.boundingBox.min.y > 50)) { o.visible = false; return; }
+    const old = o.material, map = old.map;
+    if (map) map.encoding = THREE.LinearEncoding; // samma färghantering som resten av banan
+    o.material = new THREE.MeshLambertMaterial({ map, skinning: true, transparent: old.transparent, alphaTest: old.alphaTest, side: old.side });
+    o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
+    o.geometry.computeBoundingSphere(); o.geometry.boundingSphere.radius *= 2; // animationerna rör sig utanför vilopositionen
+    if (name === 'm4_world.BMP') gunMesh = o; else meshes.push(o); // vapnet tar inga träffar
+  });
+  // Animationerna flyttar hela kroppen framåt/åt sidan; spelet sköter förflyttningen, så lås den (utom i dödsfallen)
+  for (const c of gltf.animations) {
+    if (/\|die/.test(c.name)) continue;
+    for (const t of c.tracks) if (t.name === 'Bip01_00.position') {
+      const v = t.values; for (let i = 3; i < v.length; i += 3) { v[i] = v[0]; v[i + 1] = v[1]; }
+    }
+  }
+  const holder = new THREE.Group();
+  holder.add(root);
+  holder.scale.setScalar(BOT_MODEL_H / 80); // modellen är ca 80 Half-Life-enheter hög
+  holder.rotation.y = Math.PI;              // modellen tittar mot +z, boten mot −z
+  botG.add(holder);
+  const mixer = new THREE.AnimationMixer(root);
+  const act = (n, once) => {
+    const c = gltf.animations.find(a => a.name.endsWith('|' + n)); if (!c) return null;
+    const a = mixer.clipAction(c);
+    if (once) { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
+    return a;
+  };
+  // Gånghastighet (m/s) som varje animation är gjord för, så att fötterna inte glider
+  const s = BOT_MODEL_H / 80;
+  const A = {
+    idle: { a: act('combatidle'), v: 0 }, walk: { a: act('walk1'), v: 112 / 3.54 * s }, run: { a: act('run'), v: 160 * s },
+    left: { a: act('strafeleft'), v: 115 / 0.83 * s }, right: { a: act('straferight'), v: 115 / 0.83 * s },
+    die: { a: act('diesimple', true) }, dieHead: { a: act('dieheadshot', true) }, dieBack: { a: act('diebackwards', true) }
+  };
+  const bones = {}; root.traverse(o => { if (o.isBone) bones[o.name] = o; });
+  botModel = { holder, root, mixer, A, cur: null, meshes, head: bones.Bip01_Head_025, gun: bones.m4_023, tip: new THREE.Vector3(), dead: false, pose: 0 };
+  // Mynningsflamman: hitta pipans spets på M4:an (punkten längst fram i viloläget) i vapenbenets koordinater
+  playBotAnim('idle'); mixer.update(0.01); holder.updateMatrixWorld(true);
+  if (gunMesh && botModel.gun) {
+    const p = new THREE.Vector3(), best = new THREE.Vector3(); let bz = Infinity;
+    const pos = gunMesh.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      p.fromBufferAttribute(pos, i); gunMesh.boneTransform(i, p); p.applyMatrix4(gunMesh.matrixWorld);
+      const lz = botG.worldToLocal(p.clone()).z; if (lz < bz) { bz = lz; best.copy(p); }
+    }
+    botModel.tip.copy(botModel.gun.worldToLocal(best));
+  }
+  hips.visible = false; torso.visible = false; // göm blockfiguren
+  botG.add(botFlash);
+}
+function playBotAnim(name, fade = 0.2) {
+  const m = botModel, next = m.A[name]; if (!next || !next.a || m.cur === next) return next;
+  next.a.reset().setEffectiveWeight(1).fadeIn(fade).play();
+  if (m.cur && m.cur.a) m.cur.a.fadeOut(fade);
+  m.cur = next; return next;
+}
+// Varje bildruta: välj animation efter hur boten rör sig, och spela upp den
+function animateBotModel(dt) {
+  const m = botModel;
+  if (!bot.alive) {
+    if (!m.dead) { m.dead = true; playBotAnim(bot.lastZone === 'head' ? 'dieHead' : Math.random() < 0.5 ? 'die' : 'dieBack', 0.1); m.cur.a.timeScale = 1; }
+  } else {
+    if (m.dead) { m.dead = false; m.cur = null; m.mixer.stopAllAction(); }
+    const hsp = Math.hypot(bot.vx, bot.vz);
+    const s = Math.sin(bot.yaw), c = Math.cos(bot.yaw);
+    const fwd = -(bot.vx * s + bot.vz * c), side = bot.vx * c - bot.vz * s; // fart framåt och åt höger
+    let cur;
+    if (hsp < 0.25) cur = playBotAnim('idle');
+    else if (Math.abs(side) > Math.abs(fwd)) cur = playBotAnim(side > 0 ? 'right' : 'left');
+    else cur = playBotAnim(hsp > 2.2 ? 'run' : 'walk');
+    if (cur && cur.v) cur.a.timeScale = Math.max(0.4, Math.min(2.5, hsp / cur.v)) * (cur === m.A.walk || cur === m.A.run ? Math.sign(fwd || 1) : 1);
+    else if (cur) cur.a.timeScale = 1;
+  }
+  m.mixer.update(dt);
+  m.head.scale.setScalar(S.headSize);
+  m.pose++; // ny pose: träfftestet räknar om hörnens positioner
+  // Mynningsflamman sitter på pipans spets
+  if (m.gun) { m.holder.updateMatrixWorld(true); botFlash.position.copy(botG.worldToLocal(m.gun.localToWorld(_hp.copy(m.tip)))); }
+}
+
 function botLevel() { return BOT_LEVELS[S.botLevel] || BOT_LEVELS[1]; }
 const SPAWN_P = { x: 0, z: ARENA_L / 2 - 3, yaw: 0 }, SPAWN_B = { x: 0, z: -ARENA_L / 2 + 3, yaw: Math.PI };
 function freePoint() { // en slumpad plats på golvet som inte är inne i en låda
@@ -1906,6 +2135,8 @@ function updateBot(dt) {
   const L = botLevel();
   if (!bot.alive) {
     bot.deadT += dt;
+    botFlash.visible = false;
+    if (botModel) { animateBotModel(dt); return; } // modellen har egna dödsanimationer
     const f = Math.min(1, bot.deadT / 0.45);
     botG.rotation.set(-f * f * Math.PI / 2 * 0.95, bot.yaw, 0);
     botG.position.y = bot.y + f * 0.12;
@@ -2000,6 +2231,8 @@ function updateBot(dt) {
   botG.rotation.set(0, bot.yaw, 0);
   armsG.rotation.x = bot.pitch - bot.punchX * D2R * 0.5;
   headG.rotation.x = bot.pitch * 0.6;
+  headG.scale.setScalar(S.headSize); // huvudets storlek: modellen och träffytan är samma, så båda krymper
+  if (botModel) animateBotModel(dt);
   botFlash.visible = bot.flash > 0;
 }
 // ---------- Hitmarker ----------
@@ -2048,12 +2281,13 @@ function updateHitMarker(dt) {
 // Spelaren träffar boten
 function hitBot(o, d, maxT, kind) {
   if (!bot.alive || S.botOn <= 0) return null;
-  const h = rayFigure(o, d, bot.x, bot.y, bot.z, BOT_H, BOT_R);
+  const h = rayBotModel(o, d, maxT);
   if (!h || h.t >= maxT) return null;
   return h;
 }
 function damageBot(dmg, kind, zone, point) {
   applyDamage(bot, dmg, kind, zone);
+  bot.lastZone = zone; // för dödsanimationen
   bot.alertT = 2; bot.lastSeen = { x: P.pos.x, z: P.pos.z };
   bot.errY *= 1.3; bot.errP *= 1.3; // den blir lite skakig av att bli träffad
   // Blod

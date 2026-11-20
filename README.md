@@ -44,7 +44,14 @@ Tips: använd C för att huka. Ctrl + W stänger fliken i de flesta webbläsare.
 ## Teknik
 
 - En fil: `index.html` med HTML, CSS och JavaScript.
-- [Three.js r128](https://threejs.org/) laddas från cdnjs.
-- Alla modeller, texturer och ljud skapas i koden. Inga externa resurser behövs.
+- [Three.js r128](https://threejs.org/) laddas från cdnjs, och GLTFLoader från jsDelivr.
+- Botens soldatmodell laddas från `Model/terror1.glb` (med skelett och animationer). Om filen inte går att
+  ladda används en enkel blockfigur. Banan, vapnen, texturerna och ljuden skapas i koden.
+
+## Tack till
+
+- Botens modell: ["PC Computer - Half-Life - HECU Grunt HD"](https://sketchfab.com/3d-models/pc-computer-half-life-hecu-grunt-hd-ba7e8074bd4345579ede43fa2795ffa3)
+  av [8-Bit Play](https://sketchfab.com/8-bit_play), licens [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/).
+  Ändrad: bara en huvudvariant och ett vapen visas, och animationernas förflyttning är borttagen.
 
 Fragment är ett fristående hobbyprojekt och har ingen koppling till Valve eller något annat spelföretag.

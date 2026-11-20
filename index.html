@@ -457,7 +457,7 @@ const CS_U = 1.2 / 64;                 // meter per CS-enhet
 const CS_GRAV = 800 * CS_U;            // sv_gravity 800 ≈ 15 m/s²
 // Förinställningar: [maxfart, sv_accelerate, sv_airaccelerate, sv_friction, sv_stopspeed, hopphöjd (enheter), hukningstid (s), bunnyhoppstak]
 const CS_PRESETS = [
-  { name: 'CS 1.6', speed: 280, accel: 5, air: 20, fric: 4, stop: 75, jump: 40, duck: 0.4, bhop: 2.25 }, // spelets standard
+  { name: 'CS 1.6', speed: 280, accel: 5, air: 40, fric: 4, stop: 75, jump: 40, duck: 0.4, bhop: 3 }, // spelets standard
   { name: 'CS2', speed: 280, accel: 5.5, air: 12, fric: 5.2, stop: 80, jump: 56, duck: 0.2, bhop: 3 }
 ];
 let csLandedFrame = false, csPrevYaw = null;
@@ -515,7 +515,7 @@ function updateCS(dt) {
     csJumpBuf = 0; jumpedNow = true;
     // Bunnyhoppsskydd (CS 1.6): över 120 % av maxfarten bromsas man ner till 65 % av taket
     const hs0 = Math.hypot(P.vel.x, P.vel.z), cap = maxSp * S.csBhop;
-    if (S.csBhop < 3 && hs0 > cap) { const k = (cap / hs0) * 0.65; P.vel.x *= k; P.vel.z *= k; }
+    if (S.csBhop < 4 && hs0 > cap) { const k = (cap / hs0) * 0.65; P.vel.x *= k; P.vel.z *= k; }
     // Varje hopp kostar fart (som ett tick av markfriktion vid landningen), så bunnyhopp kräver bra strafes
     P.vel.x *= 1 - S.csHopLoss; P.vel.z *= 1 - S.csHopLoss;
     let vy = Math.sqrt(2 * CS_GRAV * S.csJump * CS_U);
@@ -541,7 +541,7 @@ function updateCS(dt) {
     csAccelerate(wx, wz, wish, S.csAccel, dt, wish);
   } else {
     // I luften: farten framåt ökar knappt, men den kan vridas genom att strafea och dra musen
-    csAccelerate(wx, wz, wish, S.csAirAccel, dt, 30 * CS_U);
+    csAccelerate(wx, wz, wish, S.csAirAccel, dt, S.csAirCap * CS_U);
   }
   csFuser = Math.max(0, csFuser - dt * 1000);
   csStam = Math.max(0, csStam - dt * 60);
@@ -843,11 +843,12 @@ const DEFS = [
   { id: 'wheelJump', label: 'Scrollhjulet', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'Hopp (bunnyhopp)' : 'Ändrar synfält' },
   { id: 'csSpeed', label: 'Maxfart (enheter/s, kniv = 250)', min: 100, max: 450, step: 1, def: 280, f: v => v + ' (' + (v * CS_U).toFixed(2) + ' m/s)' },
   { id: 'csAccel', label: 'sv_accelerate', min: 1, max: 15, step: 0.1, def: 5, f: v => v.toFixed(1) },
-  { id: 'csAirAccel', label: 'sv_airaccelerate', min: 0, max: 150, step: 1, def: 20, f: v => v },
+  { id: 'csAirAccel', label: 'sv_airaccelerate', min: 0, max: 150, step: 1, def: 40, f: v => v },
+  { id: 'csAirCap', label: 'Fart att vinna per strafe (air cap, CS = 30)', min: 10, max: 80, step: 1, def: 30, f: v => v },
   { id: 'csFriction', label: 'sv_friction', min: 1, max: 10, step: 0.1, def: 4, f: v => v.toFixed(1) },
   { id: 'csStop', label: 'sv_stopspeed', min: 25, max: 200, step: 1, def: 75, f: v => v },
   { id: 'csJump', label: 'Hopphöjd (enheter, låda = 64)', min: 20, max: 100, step: 1, def: 40, f: v => v + ' (' + (v * CS_U).toFixed(2) + ' m)' },
-  { id: 'csBhop', label: 'Bunnyhoppsskydd', min: 1, max: 3, step: 0.05, def: 2.25, f: v => v >= 3 ? 'Av' : 'Över ' + Math.round(v * 100) + ' % av maxfart' },
+  { id: 'csBhop', label: 'Bunnyhoppsskydd', min: 1, max: 4, step: 0.05, def: 3, f: v => v >= 4 ? 'Av' : 'Över ' + Math.round(v * 100) + ' % av maxfart' },
   { id: 'csJumpWin', label: 'Hoppfönster (hur exakt hoppet måste tajmas)', min: 0.001, max: 0.1, step: 0.001, def: 0.005, f: v => Math.round(v * 1000) + ' ms' },
   { id: 'csHopLoss', label: 'Fartförlust per hopp', min: 0, max: 0.3, step: 0.01, def: 0.12, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
   { g: 'Realistiskt läge' },
@@ -880,6 +881,8 @@ try {
   // Äldre sparade CS-värden var i meter; släng dem så att de nya standardvärdena används
   if (saved.csJumpWin === 0.015) delete saved.csJumpWin; // förra standardvärdena för bunnyhopp: använd de nya
   if (saved.csHopLoss === 0.08) delete saved.csHopLoss;
+  if (saved.csAirAccel === 20) delete saved.csAirAccel; // förra standard: 20 → 40 (större skillnad för bra strafes)
+  if (saved.csBhop === 2.25) delete saved.csBhop;       // förra standard: 225 % → 300 %
   if (saved.csSpeed === 250) delete saved.csSpeed; // gamla standardfarten: använd den nya, lite snabbare
   if (typeof saved.csSpeed === 'number' && saved.csSpeed < 20) {
     for (const k of ['csSpeed', 'csJump', 'csBhop', 'csAccel', 'csAirAccel', 'csFriction']) delete saved[k];
@@ -936,8 +939,8 @@ const BUILTIN_PROFILES = {
     fov: 72, sens: 1, blur: 0.6, edgeBlur: 1, shake: 1, turnTilt: 1, airMouse: 0.3, airShake: 1, jumpVar: 1,
     sway: 1, breath: 1, eye: 1.7, mode: 1, xhSpeed: 2, hitmark: 1, hitSound: 1, botOn: 1, botLevel: 1,
     gunVol: 0.8, tracers: 1, duckAcc: 0.6, wallbang: 1, recoil: 0.6, firstShot: 1, tapTime: 0.3, spreadK: 1.6, vmKick: 0.6, vmScale: 0.68,
-    vmBob: 1, vmFlash: 1, csPreset: 0, csSens: 2, wheelJump: 1, csSpeed: 280, csAccel: 5, csAirAccel: 20,
-    csFriction: 4, csStop: 75, csJump: 40, csBhop: 2.25, csJumpWin: 0.005, csHopLoss: 0.12
+    vmBob: 1, vmFlash: 1, csPreset: 0, csSens: 2, wheelJump: 1, csSpeed: 280, csAccel: 5, csAirAccel: 40,
+    csFriction: 4, csStop: 75, csJump: 40, csBhop: 3, csJumpWin: 0.005, csHopLoss: 0.12
   }
 };
 let userProfiles = {};

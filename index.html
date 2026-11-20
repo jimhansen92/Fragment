@@ -379,6 +379,7 @@ function initAudio() {
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     }
     if (actx.state === 'suspended') actx.resume();
+    prepHsSound();
   } catch (e) { actx = null; }
 }
 function footstep(vol) {
@@ -456,7 +457,7 @@ const CS_U = 1.2 / 64;                 // meter per CS-enhet
 const CS_GRAV = 800 * CS_U;            // sv_gravity 800 ≈ 15 m/s²
 // Förinställningar: [maxfart, sv_accelerate, sv_airaccelerate, sv_friction, sv_stopspeed, hopphöjd (enheter), hukningstid (s), bunnyhoppstak]
 const CS_PRESETS = [
-  { name: 'CS 1.6', speed: 280, accel: 5, air: 10, fric: 4, stop: 75, jump: 46, duck: 0.4, bhop: 1.2 },
+  { name: 'CS 1.6', speed: 280, accel: 5, air: 20, fric: 4, stop: 75, jump: 40, duck: 0.4, bhop: 2.25 }, // spelets standard
   { name: 'CS2', speed: 280, accel: 5.5, air: 12, fric: 5.2, stop: 80, jump: 56, duck: 0.2, bhop: 3 }
 ];
 let csDucked = false, csDuck = 0, csDuckT = 0, csJumpBuf = 0, csStepDist = 0, csFuser = 0, csStam = 0;
@@ -802,6 +803,7 @@ const DEFS = [
   { id: 'xhSpeed', label: 'Hur snabbt hårkorset drar ihop sig', min: 0.5, max: 4, step: 0.1, def: 2, f: v => v.toFixed(1) + '×' },
   { g: 'Hitmarker' },
   { id: 'hitmark', label: 'Hitmarker', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
+  { id: 'hsSound', label: 'Ljud när du dödar med huvudskott', min: 0, max: 1.5, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
   { id: 'hitSound', label: 'Träffljud', min: 0, max: 1.5, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
   { g: 'Bot' },
   { id: 'botOn', label: 'Bot', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
@@ -821,17 +823,17 @@ const DEFS = [
   { id: 'vmBob', label: 'Vapnet gungar när du går', min: 0, max: 2, step: 0.05, def: 1, f: v => v ? Math.round(v * 100) + ' %' : 'Av' },
   { id: 'vmFlash', label: 'Mynningsflamma', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'På' : 'Av' },
   { g: 'CS-läge' },
-  { id: 'csPreset', label: 'Spel att efterlikna', min: 0, max: 1, step: 1, def: 1, f: v => CS_PRESETS[v].name },
+  { id: 'csPreset', label: 'Spel att efterlikna', min: 0, max: 1, step: 1, def: 0, f: v => CS_PRESETS[v].name },
   { id: 'csSens', label: 'Muskänslighet (samma tal som i CS)', min: 0.1, max: 10, step: 0.01, def: 2, f: v => v.toFixed(2) },
   { id: 'wheelJump', label: 'Scrollhjulet', min: 0, max: 1, step: 1, def: 1, f: v => v ? 'Hopp (bunnyhopp)' : 'Ändrar synfält' },
   { id: 'csSpeed', label: 'Maxfart (enheter/s, kniv = 250)', min: 100, max: 450, step: 1, def: 280, f: v => v + ' (' + (v * CS_U).toFixed(2) + ' m/s)' },
-  { id: 'csAccel', label: 'sv_accelerate', min: 1, max: 15, step: 0.1, def: 5.5, f: v => v.toFixed(1) },
-  { id: 'csAirAccel', label: 'sv_airaccelerate', min: 0, max: 150, step: 1, def: 12, f: v => v },
-  { id: 'csFriction', label: 'sv_friction', min: 1, max: 10, step: 0.1, def: 5.2, f: v => v.toFixed(1) },
-  { id: 'csStop', label: 'sv_stopspeed', min: 25, max: 200, step: 1, def: 80, f: v => v },
-  { id: 'csJump', label: 'Hopphöjd (enheter, låda = 64)', min: 20, max: 100, step: 1, def: 56, f: v => v + ' (' + (v * CS_U).toFixed(2) + ' m)' },
-  { id: 'csBhop', label: 'Bunnyhoppsskydd', min: 1, max: 3, step: 0.05, def: 3, f: v => v >= 3 ? 'Av' : 'Över ' + Math.round(v * 100) + ' % av maxfart' },
-  { id: 'csJumpWin', label: 'Hoppfönster (hur exakt hoppet måste tajmas)', min: 0.005, max: 0.1, step: 0.005, def: 0.01, f: v => Math.round(v * 1000) + ' ms' },
+  { id: 'csAccel', label: 'sv_accelerate', min: 1, max: 15, step: 0.1, def: 5, f: v => v.toFixed(1) },
+  { id: 'csAirAccel', label: 'sv_airaccelerate', min: 0, max: 150, step: 1, def: 20, f: v => v },
+  { id: 'csFriction', label: 'sv_friction', min: 1, max: 10, step: 0.1, def: 4, f: v => v.toFixed(1) },
+  { id: 'csStop', label: 'sv_stopspeed', min: 25, max: 200, step: 1, def: 75, f: v => v },
+  { id: 'csJump', label: 'Hopphöjd (enheter, låda = 64)', min: 20, max: 100, step: 1, def: 40, f: v => v + ' (' + (v * CS_U).toFixed(2) + ' m)' },
+  { id: 'csBhop', label: 'Bunnyhoppsskydd', min: 1, max: 3, step: 0.05, def: 2.25, f: v => v >= 3 ? 'Av' : 'Över ' + Math.round(v * 100) + ' % av maxfart' },
+  { id: 'csJumpWin', label: 'Hoppfönster (hur exakt hoppet måste tajmas)', min: 0.005, max: 0.1, step: 0.005, def: 0.005, f: v => Math.round(v * 1000) + ' ms' },
   { id: 'csHopLoss', label: 'Fartförlust per hopp', min: 0, max: 0.3, step: 0.01, def: 0.12, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
   { g: 'Realistiskt läge' },
   { id: 'speed', label: 'Gånghastighet', min: 0.5, max: 8, step: 0.1, def: 2.2, f: v => v.toFixed(1) + ' m/s' },
@@ -2273,6 +2275,23 @@ function hitMarker(kind) { // 'hit', 'head' eller 'kill'
     } catch (e) {}
   }
 }
+// Ljudfil när du dödar med huvudskott (Sound/hs.wav). Filen hämtas direkt och avkodas när ljudet är igång.
+let hsWav = null, hsBuf = null;
+fetch('Sound/hs.wav').then(r => r.ok ? r.arrayBuffer() : null).then(b => { hsWav = b; prepHsSound(); }).catch(() => {});
+function prepHsSound() { // avkoda i förväg så att ljudet kommer direkt första gången
+  if (hsBuf || !hsWav || !actx) return;
+  const w = hsWav; hsWav = null;
+  actx.decodeAudioData(w, b => { hsBuf = b; }, () => {});
+}
+function playHsKill() {
+  if (S.hsSound <= 0 || !actx || actx.state !== 'running') return;
+  const play = () => {
+    const src = actx.createBufferSource(), g = actx.createGain();
+    src.buffer = hsBuf; g.gain.value = S.hsSound;
+    src.connect(g); g.connect(actx.destination); src.start();
+  };
+  if (hsBuf) play(); else prepHsSound();
+}
 function updateHitMarker(dt) {
   hmT = Math.max(0, hmT - dt);
   hm.style.opacity = playing ? Math.min(1, hmT / hmDur * 1.6) : 0;
@@ -2301,6 +2320,7 @@ function damageBot(dmg, kind, zone, point) {
   if (bot.hp <= 0 && bot.alive) {
     bot.alive = false; bot.deadT = 0; bot.hp = 0;
     hitMarker('kill');
+    if (zone === 'head') playHsKill();
     roundOver(true, zone === 'head');
   } else hitMarker(zone === 'head' ? 'head' : 'hit');
 }

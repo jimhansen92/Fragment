@@ -26,6 +26,9 @@ details.set summary{cursor:pointer;font-weight:700;font-size:17px;padding:8px 0;
 .row input{grid-column:1/-1;width:100%;accent-color:#e8a33a;height:26px;margin:0;cursor:pointer}
 .reset{background:transparent;color:#f3efe2;border:1px solid rgba(243,239,226,.35);font-size:15px;padding:8px 16px;margin-top:10px}
 .reset:hover{background:rgba(243,239,226,.1)}
+.prof{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 4px}
+.prof select{flex:1 1 160px;min-height:40px;font:inherit;font-size:15px;padding:6px 8px;border-radius:8px;background:#2a2418;color:#f3efe2;border:1px solid rgba(243,239,226,.35)}
+.prof .reset{margin-top:0}
 button{font:inherit;font-size:18px;font-weight:700;padding:12px 28px;border:0;border-radius:10px;background:#e8a33a;color:#1b1408;cursor:pointer;min-height:44px}
 button:hover{background:#f2b453}
 button:focus-visible{outline:3px solid #fff;outline-offset:2px}
@@ -62,6 +65,11 @@ button:focus-visible{outline:3px solid #fff;outline-offset:2px}
     <button id="play">Klicka för att spela</button>
     <details class="set" id="setBox">
       <summary>Inställningar</summary>
+      <div class="prof">
+        <select id="profSel" aria-label="Profil"></select>
+        <button class="reset" id="profSave" type="button">Spara som profil</button>
+        <button class="reset" id="profDel" type="button">Ta bort</button>
+      </div>
       <div id="settings"></div>
       <button class="reset" id="reset" type="button">Återställ allt</button>
     </details>
@@ -857,6 +865,50 @@ DEFS.forEach(d => {
 document.getElementById('reset').addEventListener('click', () => {
   DEFS.forEach(d => { if (d.id) S[d.id] = d.def; }); qualityDirty = true; applySettings();
 });
+
+// ---------- Profiler ----------
+// Inbyggda profiler följer med spelet (fungerar på alla datorer); egna sparas i webbläsaren.
+// En profil sätter bara de inställningar den innehåller – övriga lämnas som de är.
+const BUILTIN_PROFILES = {
+  'Min profil': {
+    fov: 72, sens: 1, blur: 0.6, edgeBlur: 1, shake: 1, turnTilt: 1, airMouse: 0.3, airShake: 1, jumpVar: 1,
+    sway: 1, breath: 1, eye: 1.7, mode: 1, xhSpeed: 2, hitmark: 1, hitSound: 1, botOn: 1, botLevel: 1,
+    gunVol: 0.8, tracers: 1, duckAcc: 0.6, wallbang: 1, recoil: 0.6, spreadK: 1.2, vmKick: 0.6, vmScale: 0.68,
+    vmBob: 1, vmFlash: 1, csPreset: 0, csSens: 2, wheelJump: 1, csSpeed: 280, csAccel: 5, csAirAccel: 20,
+    csFriction: 4, csStop: 75, csJump: 40, csBhop: 2.25, csJumpWin: 0.005, csHopLoss: 0.12
+  }
+};
+let userProfiles = {};
+try { userProfiles = JSON.parse(localStorage.getItem('fragment-profiles') || '{}') || {}; } catch (e) {}
+const profSel = document.getElementById('profSel');
+function allProfiles() { return Object.assign({}, BUILTIN_PROFILES, userProfiles); }
+function renderProfiles(sel) {
+  const names = Object.keys(allProfiles());
+  profSel.innerHTML = '<option value="">Välj profil…</option>' +
+    names.map(n => `<option>${n.replace(/[&<>"]/g, c => '&#' + c.charCodeAt(0) + ';')}</option>`).join('');
+  profSel.value = sel && names.includes(sel) ? sel : '';
+  document.getElementById('profDel').hidden = !(profSel.value in userProfiles);
+}
+function applyProfile(name) {
+  const p = allProfiles()[name]; if (!p) return;
+  DEFS.forEach(d => { if (d.id && typeof p[d.id] === 'number') S[d.id] = Math.max(d.min, Math.min(d.max, p[d.id])); });
+  qualityDirty = true; applySettings();
+}
+function saveUserProfiles() { try { localStorage.setItem('fragment-profiles', JSON.stringify(userProfiles)); } catch (e) {} }
+profSel.addEventListener('change', () => { applyProfile(profSel.value); renderProfiles(profSel.value); });
+document.getElementById('profSave').addEventListener('click', () => {
+  const name = (prompt('Namn på profilen:', profSel.value in userProfiles ? profSel.value : '') || '').trim().slice(0, 40);
+  if (!name) return;
+  if (name in BUILTIN_PROFILES) { alert('Det namnet används av en inbyggd profil. Välj ett annat.'); return; }
+  const p = {}; DEFS.forEach(d => { if (d.id) p[d.id] = S[d.id]; });
+  userProfiles[name] = p; saveUserProfiles(); renderProfiles(name);
+});
+document.getElementById('profDel').addEventListener('click', () => {
+  const n = profSel.value;
+  if (!(n in userProfiles) || !confirm('Ta bort profilen "' + n + '"?')) return;
+  delete userProfiles[n]; saveUserProfiles(); renderProfiles('');
+});
+renderProfiles('');
 addEventListener('wheel', e => {
   if (!playing) return;
   e.preventDefault();
@@ -1253,7 +1305,11 @@ function raycastWorld(o, d) {
 // ----- Skjuta -----
 const _o = new THREE.Vector3(), _d = new THREE.Vector3(), _r = new THREE.Vector3(), _u = new THREE.Vector3();
 function fireBullet(spread, kind) {
+  // Kulan går dit siktet pekar: samma rekyl (punch) som sikten visas med läggs på skottets riktning
+  const rx = camera.rotation.x, ry = camera.rotation.y;
+  camera.rotation.x -= WS.punchX * D2R; camera.rotation.y += WS.punchY * D2R;
   camera.updateMatrixWorld();
+  camera.rotation.x = rx; camera.rotation.y = ry;
   _o.setFromMatrixPosition(camera.matrixWorld);
   const e = camera.matrixWorld.elements;
   _r.set(e[0], e[1], e[2]); _u.set(e[4], e[5], e[6]); _d.set(-e[8], -e[9], -e[10]);

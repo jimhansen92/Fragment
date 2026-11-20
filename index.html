@@ -463,7 +463,7 @@ function csAccelerate(wx, wz, wishspeed, accel, dt, cap) {
   const as = Math.min(accel * dt * wishspeed, add);
   P.vel.x += as * wx; P.vel.z += as * wz;
 }
-function csJumpNow() { csJumpBuf = 0.02; } // från scrollhjulet: ett kort tryck, som i CS
+function csJumpNow() { csJumpBuf = S.csJumpWin; } // från scrollhjulet: ett kort tryck, som i CS
 function updateCS(dt) {
   const is16 = S.csPreset === 0;
   const crouchKey = keys.ControlLeft || keys.ControlRight || keys.KeyC;
@@ -495,7 +495,7 @@ function updateCS(dt) {
 
   // Hopp (inget automatiskt hopp när man håller inne – nytt tryck krävs, eller scrollhjulet)
   if (!keys.Space) jumpReleased = true;
-  if (keys.Space && jumpReleased) { csJumpBuf = 0.03; jumpReleased = false; }
+  if (keys.Space && jumpReleased) { csJumpBuf = S.csJumpWin; jumpReleased = false; }
   csJumpBuf -= dt;
   let jumpedNow = false;
   if (P.ground && csJumpBuf > 0) {
@@ -503,6 +503,8 @@ function updateCS(dt) {
     // Bunnyhoppsskydd (CS 1.6): över 120 % av maxfarten bromsas man ner till 65 % av taket
     const hs0 = Math.hypot(P.vel.x, P.vel.z), cap = maxSp * S.csBhop;
     if (S.csBhop < 3 && hs0 > cap) { const k = (cap / hs0) * 0.65; P.vel.x *= k; P.vel.z *= k; }
+    // Varje hopp kostar fart (som ett tick av markfriktion vid landningen), så bunnyhopp kräver bra strafes
+    P.vel.x *= 1 - S.csHopLoss; P.vel.z *= 1 - S.csHopLoss;
     let vy = Math.sqrt(2 * CS_GRAV * S.csJump * CS_U);
     if (is16) {
       if (csFuser > 0) vy *= (100 - csFuser * 0.001 * 19) / 100; // lägre hopp om du nyss hoppat
@@ -783,6 +785,8 @@ const DEFS = [
   { id: 'csStop', label: 'sv_stopspeed', min: 25, max: 200, step: 1, def: 80, f: v => v },
   { id: 'csJump', label: 'Hopphöjd (enheter, låda = 64)', min: 20, max: 100, step: 1, def: 56, f: v => v + ' (' + (v * CS_U).toFixed(2) + ' m)' },
   { id: 'csBhop', label: 'Bunnyhoppsskydd', min: 1, max: 3, step: 0.05, def: 3, f: v => v >= 3 ? 'Av' : 'Över ' + Math.round(v * 100) + ' % av maxfart' },
+  { id: 'csJumpWin', label: 'Hoppfönster (hur exakt hoppet måste tajmas)', min: 0.005, max: 0.1, step: 0.005, def: 0.015, f: v => Math.round(v * 1000) + ' ms' },
+  { id: 'csHopLoss', label: 'Fartförlust per hopp', min: 0, max: 0.3, step: 0.01, def: 0.08, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
   { g: 'Realistiskt läge' },
   { id: 'speed', label: 'Gånghastighet', min: 0.5, max: 8, step: 0.1, def: 2.2, f: v => v.toFixed(1) + ' m/s' },
   { id: 'runSpeed', label: 'Springhastighet', min: 1, max: 14, step: 0.1, def: 5, f: v => v.toFixed(1) + ' m/s' },

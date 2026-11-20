@@ -496,7 +496,6 @@ function updateCS(dt) {
   // Hopp (inget automatiskt hopp när man håller inne – nytt tryck krävs, eller scrollhjulet)
   if (!keys.Space) jumpReleased = true;
   if (keys.Space && jumpReleased) { csJumpBuf = S.csJumpWin; jumpReleased = false; }
-  csJumpBuf -= dt;
   let jumpedNow = false;
   if (P.ground && csJumpBuf > 0) {
     csJumpBuf = 0; jumpedNow = true;
@@ -516,6 +515,7 @@ function updateCS(dt) {
     P.vel.y = vy; P.ground = false;
     footstep(0.9);
   }
+  csJumpBuf -= dt; // räknas ner efter kontrollen, så ett tryck alltid gäller minst den här bildrutan (oavsett FPS)
 
   if (P.ground && !jumpedNow) {
     csFriction(dt);
@@ -785,8 +785,8 @@ const DEFS = [
   { id: 'csStop', label: 'sv_stopspeed', min: 25, max: 200, step: 1, def: 80, f: v => v },
   { id: 'csJump', label: 'Hopphöjd (enheter, låda = 64)', min: 20, max: 100, step: 1, def: 56, f: v => v + ' (' + (v * CS_U).toFixed(2) + ' m)' },
   { id: 'csBhop', label: 'Bunnyhoppsskydd', min: 1, max: 3, step: 0.05, def: 3, f: v => v >= 3 ? 'Av' : 'Över ' + Math.round(v * 100) + ' % av maxfart' },
-  { id: 'csJumpWin', label: 'Hoppfönster (hur exakt hoppet måste tajmas)', min: 0.005, max: 0.1, step: 0.005, def: 0.015, f: v => Math.round(v * 1000) + ' ms' },
-  { id: 'csHopLoss', label: 'Fartförlust per hopp', min: 0, max: 0.3, step: 0.01, def: 0.08, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
+  { id: 'csJumpWin', label: 'Hoppfönster (hur exakt hoppet måste tajmas)', min: 0.005, max: 0.1, step: 0.005, def: 0.01, f: v => Math.round(v * 1000) + ' ms' },
+  { id: 'csHopLoss', label: 'Fartförlust per hopp', min: 0, max: 0.3, step: 0.01, def: 0.12, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
   { g: 'Realistiskt läge' },
   { id: 'speed', label: 'Gånghastighet', min: 0.5, max: 8, step: 0.1, def: 2.2, f: v => v.toFixed(1) + ' m/s' },
   { id: 'runSpeed', label: 'Springhastighet', min: 1, max: 14, step: 0.1, def: 5, f: v => v.toFixed(1) + ' m/s' },
@@ -815,6 +815,8 @@ DEFS.forEach(d => { if (d.id) S[d.id] = d.def; });
 try {
   const saved = JSON.parse(localStorage.getItem('skogen-settings') || '{}');
   // Äldre sparade CS-värden var i meter; släng dem så att de nya standardvärdena används
+  if (saved.csJumpWin === 0.015) delete saved.csJumpWin; // förra standardvärdena för bunnyhopp: använd de nya
+  if (saved.csHopLoss === 0.08) delete saved.csHopLoss;
   if (saved.csSpeed === 250) delete saved.csSpeed; // gamla standardfarten: använd den nya, lite snabbare
   if (typeof saved.csSpeed === 'number' && saved.csSpeed < 20) {
     for (const k of ['csSpeed', 'csJump', 'csBhop', 'csAccel', 'csAirAccel', 'csFriction']) delete saved[k];

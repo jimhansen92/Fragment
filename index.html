@@ -460,6 +460,7 @@ const CS_PRESETS = [
   { name: 'CS 1.6', speed: 280, accel: 5, air: 20, fric: 4, stop: 75, jump: 40, duck: 0.4, bhop: 2.25 }, // spelets standard
   { name: 'CS2', speed: 280, accel: 5.5, air: 12, fric: 5.2, stop: 80, jump: 56, duck: 0.2, bhop: 3 }
 ];
+let csLandedFrame = false, csPrevYaw = null;
 let csDucked = false, csDuck = 0, csDuckT = 0, csJumpBuf = 0, csStepDist = 0, csFuser = 0, csStam = 0;
 function csFriction(dt) {
   const sp = Math.hypot(P.vel.x, P.vel.z);
@@ -528,9 +529,9 @@ function updateCS(dt) {
     P.vel.y = vy; P.ground = false;
     footstep(0.9);
   }
-  csJumpBuf -= dt; // räknas ner efter kontrollen, så ett tryck alltid gäller minst den här bildrutan (oavsett FPS)
 
-  if (P.ground && !jumpedNow) {
+  // Bildrutan du landar i räknas som luft: du hinner inte se landningen och trycka förrän nästa bildruta
+  if (P.ground && !jumpedNow && !csLandedFrame) {
     csFriction(dt);
     // Hopputhållighet i CS 1.6: farten bromsas en stund efter ett hopp (räknat som 100 bilder/s)
     if (is16 && csFuser > 0) {
@@ -561,6 +562,7 @@ function updateCS(dt) {
     P.pos.y = gy; P.vel.y = 0; P.ground = true;
   } else P.ground = false;
   if (!wasGround && P.ground) {
+    csLandedFrame = true;
     if (fallV < -3) footstep(1.2);
     if (!is16) csStam = Math.min(80, csStam + 4);
   }
@@ -586,8 +588,21 @@ function updateCS(dt) {
   stam = 1; exhausted = false; fatigue = 0;
 }
 
+// CS-rörelsen räknas i små fasta steg (högst 1/300 s) oavsett bildfrekvens. Annars ger air strafe
+// mycket mer fart på en 240 Hz-skärm än på 60 Hz, eftersom luftaccelerationen beror på stegets längd.
+const CS_TICK = 1 / 300;
 function update(dt) {
-  if (S.mode === 1) { time += dt; updateCS(dt); return; }
+  if (S.mode === 1) {
+    time += dt;
+    const n = Math.max(1, Math.ceil(dt / CS_TICK));
+    csLandedFrame = false;
+    // Musens vridning under bildrutan fördelas jämnt över stegen, som om musen lästes av i varje steg
+    const y1 = P.yaw, y0 = csPrevYaw === null ? y1 : csPrevYaw, dy = wrapAng(y1 - y0);
+    for (let i = 0; i < n; i++) { P.yaw = y0 + dy * (i + 1) / n; updateCS(dt / n); }
+    P.yaw = y1; csPrevYaw = y1;
+    csJumpBuf -= dt; // räknas ner efter hela bildrutan, så ett tryck alltid gäller minst den här bildrutan
+    return;
+  }
   time += dt;
   // Spring bara framåt, på marken, och bara om du orkar
   const wantRun = (keys.ShiftLeft || keys.ShiftRight) && keys.KeyW && !keys.KeyS;
@@ -833,7 +848,7 @@ const DEFS = [
   { id: 'csStop', label: 'sv_stopspeed', min: 25, max: 200, step: 1, def: 75, f: v => v },
   { id: 'csJump', label: 'Hopphöjd (enheter, låda = 64)', min: 20, max: 100, step: 1, def: 40, f: v => v + ' (' + (v * CS_U).toFixed(2) + ' m)' },
   { id: 'csBhop', label: 'Bunnyhoppsskydd', min: 1, max: 3, step: 0.05, def: 2.25, f: v => v >= 3 ? 'Av' : 'Över ' + Math.round(v * 100) + ' % av maxfart' },
-  { id: 'csJumpWin', label: 'Hoppfönster (hur exakt hoppet måste tajmas)', min: 0.005, max: 0.1, step: 0.005, def: 0.005, f: v => Math.round(v * 1000) + ' ms' },
+  { id: 'csJumpWin', label: 'Hoppfönster (hur exakt hoppet måste tajmas)', min: 0.001, max: 0.1, step: 0.001, def: 0.005, f: v => Math.round(v * 1000) + ' ms' },
   { id: 'csHopLoss', label: 'Fartförlust per hopp', min: 0, max: 0.3, step: 0.01, def: 0.12, f: v => v ? Math.round(v * 100) + ' %' : 'Ingen' },
   { g: 'Realistiskt läge' },
   { id: 'speed', label: 'Gånghastighet', min: 0.5, max: 8, step: 0.1, def: 2.2, f: v => v.toFixed(1) + ' m/s' },
@@ -2069,7 +2084,7 @@ function resetRound() {
   roundT = -1; banner.style.display = 'none';
   P.hp = 100; P.armor = 100; P.dead = false;
   P.pos.set(SPAWN_P.x + (Math.random() - 0.5) * 6, 0, SPAWN_P.z);
-  P.vel.set(0, 0, 0); P.yaw = SPAWN_P.yaw; P.pitch = 0; P.ground = true; camY = null;
+  P.vel.set(0, 0, 0); P.yaw = SPAWN_P.yaw; P.pitch = 0; P.ground = true; camY = null; csPrevYaw = null;
   WEAPONS.ak.clip = 30; WEAPONS.ak.reserve = 90; WEAPONS.glock.clip = 20; WEAPONS.glock.reserve = 120;
   WS.punchX = 0; WS.punchY = 0; WS.shots = 0;
   const cur = WS.cur; WS.cur = ''; switchTo(cur === '' ? 'ak' : cur);
